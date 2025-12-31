@@ -1,0 +1,521 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../main.dart';
+import 'admin_panel_page.dart';
+
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _eventNotifications = true;
+  bool _reminders = false;
+  bool _appNotifications = true;
+  bool _sendingRequest = false;
+  bool _loadingRequestStatus = false;
+  String? _requestStatus;
+  DateTime? _requestUpdatedAt;
+  String? _profileRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+    _loadRequestStatus();
+  }
+
+  Future<void> _loadUserRole() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (data != null && mounted) {
+        setState(() {
+          _profileRole = data['role'] as String?;
+        });
+      }
+    } catch (_) {
+      // Silenciar errores de rol
+    }
+  }
+
+  Future<bool> _confirmRequestDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Solicitar rol de organizador'),
+          content: const Text(
+              'Enviaremos tu solicitud para que un administrador la revise. ¿Quieres continuar?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Solicitar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  void _requestOrganizerRole() {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Inicia sesión para enviar la solicitud')),
+      );
+      return;
+    }
+
+    if (_sendingRequest) return;
+
+    _confirmRequestDialog().then((confirmed) {
+      if (!confirmed) return;
+
+      setState(() => _sendingRequest = true);
+
+      () async {
+        try {
+          // Evita duplicados: si ya hay solicitud pendiente, solo notifica
+          final existing = await supabase
+              .from('role_requests')
+              .select('status')
+              .eq('user_id', user.id)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+
+          if (existing != null && existing['status'] == 'pending') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ya tienes una solicitud pendiente')),
+              );
+            }
+            return;
+          }
+
+          await supabase.from('role_requests').upsert({
+            'user_id': user.id,
+            'status': 'pending',
+            'message': 'Solicitud enviada desde app',
+          }, onConflict: 'user_id');
+
+          await _loadRequestStatus();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Solicitud de rol de organizador enviada')),
+            );
+          }
+        } on PostgrestException catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: ${e.message}')),
+            );
+          }
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error inesperado al enviar solicitud')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _sendingRequest = false);
+        }
+      }();
+    });
+  }
+
+  Future<void> _loadRequestStatus() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      _loadingRequestStatus = true;
+    });
+
+    try {
+      final data = await supabase
+          .from('role_requests')
+          .select('status, updated_at')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      setState(() {
+        _requestStatus = data?['status'] as String?;
+        _requestUpdatedAt = data?['updated_at'] != null
+            ? DateTime.tryParse(data!['updated_at'] as String)
+            : null;
+      });
+    } catch (_) {
+      setState(() {
+        _requestStatus = null;
+        _requestUpdatedAt = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingRequestStatus = false;
+        });
+      }
+    }
+  }
+
+  Widget _statusBadge() {
+    if (_loadingRequestStatus) {
+      return const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2.2),
+      );
+    }
+    final status = _requestStatus;
+    Color color;
+    String label;
+    switch (status) {
+      case 'approved':
+        color = Colors.green;
+        label = 'Aprobada';
+        break;
+      case 'rejected':
+        color = Colors.red;
+        label = 'Rechazada';
+        break;
+      case 'pending':
+        color = Colors.orange;
+        label = 'Pendiente';
+        break;
+      default:
+        color = Colors.grey;
+        label = 'Sin solicitud';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 31),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _statusSubtitle() {
+    String formatDate(DateTime dt) {
+      final d = dt.toLocal();
+      final dd = d.day.toString().padLeft(2, '0');
+      final mm = d.month.toString().padLeft(2, '0');
+      final yyyy = d.year.toString();
+      final hh = d.hour.toString().padLeft(2, '0');
+      final min = d.minute.toString().padLeft(2, '0');
+      return '$dd/$mm/$yyyy $hh:$min';
+    }
+
+    if (_requestStatus == null) {
+      final roleLabel = _friendlyRole(_profileRole);
+      return roleLabel.isEmpty
+          ? 'Aún no has enviado una solicitud'
+          : 'Rol actual: $roleLabel';
+    }
+
+    final updated = _requestUpdatedAt;
+    switch (_requestStatus) {
+      case 'pending':
+        if (updated != null) {
+          return 'Tu solicitud está en revisión. Enviada el ${formatDate(updated)}';
+        }
+        return 'Tu solicitud está en revisión.';
+      case 'approved':
+        if (updated != null) {
+          return 'Solicitud aprobada el ${formatDate(updated)}. Ya cuentas con el rol de organizador.';
+        }
+        return 'Solicitud aprobada. Ya cuentas con el rol de organizador.';
+      case 'rejected':
+        if (updated != null) {
+          final daysSince = DateTime.now().difference(updated.toLocal()).inDays;
+          final remaining = (30 - daysSince).clamp(0, 30);
+          if (remaining > 0) {
+            return 'Solicitud rechazada el ${formatDate(updated)}. Podrás volver a solicitar en $remaining días.';
+          } else {
+            return 'Solicitud rechazada el ${formatDate(updated)}. Ya puedes volver a solicitar.';
+          }
+        }
+        return 'Solicitud rechazada.';
+      default:
+        if (updated != null) {
+          return 'Último estado: $_requestStatus. Actualizado el ${formatDate(updated)}';
+        }
+        return 'Último estado: $_requestStatus';
+    }
+  }
+
+  bool _canRequestOrganizer() {
+    final role = _profileRole;
+    if (role == 'organizer' || role == 'admin') return false;
+    if (_requestStatus == null) return true;
+    if (_requestStatus == 'pending') return false;
+    if (_requestStatus == 'rejected' && _requestUpdatedAt != null) {
+      final daysSince = DateTime.now().difference(_requestUpdatedAt!.toLocal()).inDays;
+      return daysSince >= 30;
+    }
+    return true;
+  }
+
+  bool _shouldShowStatusTile() {
+    final role = _profileRole;
+    if (role == 'organizer' || role == 'admin') return false;
+    return _requestStatus != null;
+  }
+
+  String _friendlyRole(String? role) {
+    switch (role) {
+      case 'admin':
+        return 'Administrador';
+      case 'organizer':
+        return 'Organizador';
+      case 'student':
+        return 'Estudiante';
+      default:
+        return role ?? '';
+    }
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionCard({required List<Widget> children}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _leadingIcon(IconData icon) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F2FC),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: const Color(0xFF1976D2)),
+    );
+  }
+
+  ListTile _switchTile({
+    required IconData icon,
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return ListTile(
+      leading: _leadingIcon(icon),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+      trailing: Switch(
+        value: value,
+        thumbColor: WidgetStateProperty.all(Colors.white),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const Color(0xFF1976D2);
+          }
+          return Colors.grey[400];
+        }),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  ListTile _navigationTile({
+    required IconData icon,
+    required String title,
+    Color? titleColor,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      leading: _leadingIcon(icon),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: titleColor ?? Colors.black87,
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      onTap: onTap,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Configuración'),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        children: [
+          _sectionTitle('Notificaciones'),
+          _sectionCard(
+            children: [
+              _switchTile(
+                icon: Icons.event_available_outlined,
+                title: 'Notificaciones de Eventos',
+                value: _eventNotifications,
+                onChanged: (v) => setState(() => _eventNotifications = v),
+              ),
+              const Divider(height: 1),
+              _switchTile(
+                icon: Icons.alarm_outlined,
+                title: 'Recordatorios',
+                value: _reminders,
+                onChanged: (v) => setState(() => _reminders = v),
+              ),
+              const Divider(height: 1),
+              _switchTile(
+                icon: Icons.notifications_none_outlined,
+                title: 'Notificaciones de la aplicación',
+                value: _appNotifications,
+                onChanged: (v) => setState(() => _appNotifications = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _sectionTitle('Cuenta'),
+          _sectionCard(
+            children: [
+              if (_profileRole == 'admin') ...[
+                _navigationTile(
+                  icon: Icons.admin_panel_settings,
+                  title: 'Panel de administración',
+                  titleColor: Colors.blue.shade700,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AdminPanelPage(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+              ],
+              if (_shouldShowStatusTile()) ...[
+                ListTile(
+                  leading: _leadingIcon(Icons.verified_user_outlined),
+                  title: const Text(
+                    'Estado de solicitud de organizador',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(_statusSubtitle()),
+                  trailing: _statusBadge(),
+                  onTap: _loadRequestStatus,
+                ),
+                const Divider(height: 1),
+              ],
+              _navigationTile(
+                icon: Icons.lock_reset_outlined,
+                title: 'Cambiar contraseña',
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cambiar contraseña próximamente')),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              if (_profileRole != 'admin' && _profileRole != 'organizer') ...[
+                _navigationTile(
+                  icon: Icons.badge_outlined,
+                  title: 'Solicitar rol de organizador',
+                  titleColor: _canRequestOrganizer() ? Colors.black87 : Colors.grey,
+                  onTap: _canRequestOrganizer() ? _requestOrganizerRole : null,
+                ),
+                const Divider(height: 1),
+              ],
+              _navigationTile(
+                icon: Icons.logout,
+                title: 'Cerrar sesión',
+                titleColor: Colors.red,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cerrar sesión desde la pantalla de perfil')),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _sectionTitle('Información'),
+          _sectionCard(
+            children: [
+              _navigationTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Política de privacidad',
+                onTap: () {},
+              ),
+              const Divider(height: 1),
+              _navigationTile(
+                icon: Icons.description_outlined,
+                title: 'Términos de servicio',
+                onTap: () {},
+              ),
+              const Divider(height: 1),
+              _navigationTile(
+                icon: Icons.info_outline,
+                title: 'Acerca de la aplicación',
+                onTap: () {},
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}

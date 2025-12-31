@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Replace avoid_print occurrences and add foundation import",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"$content = Get-Content lib/pages/inicio_page.dart -Raw;",
+				"$content = $content -replace \"print\\('Error cargando imagen: \\$error'\\);\",\"if (kDebugMode) { debugPrint('Error cargando imagen: $error'); }\";",
+				"$content = $content -replace \"import 'package:flutter/material.dart';\\nimport 'package:supabase_flutter/supabase_flutter.dart';\\n\\nimport '../main.dart';\",\"import 'package:flutter/material.dart';\\nimport 'package:flutter/foundation.dart';\\nimport 'package:supabase_flutter/supabase_flutter.dart';\\n\\nimport '../main.dart';\";",
+				"Set-Content lib/pages/inicio_page.dart $content;",
+				"flutter analyze"
+			]
+		}
+	]
+}
