@@ -49,7 +49,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -100,14 +101,15 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icon/unieventos_launcher.png"
+  image_path: "assets/icon/unieventos_icon.png"
   adaptive_icon_background: "#0D1117"
-  adaptive_icon_foreground: "assets/icon/unieventos_launcher.png"
+  adaptive_icon_foreground: "assets/icon/unieventos_icon.png"
 
 flutter_native_splash:
   color: "#0D1117"
-  image: assets/splash/unieventos_splash.png
+  image: assets/splash/unieventos_icon.png
 
   android_12:
     color: "#0D1117"
-    image: assets/splash/unieventos_splash.png
+    image: assets/splash/unieventos_icon.png
+

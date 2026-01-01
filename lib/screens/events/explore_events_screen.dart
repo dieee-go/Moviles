@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class ExploreEventsScreen extends StatefulWidget {
   const ExploreEventsScreen({super.key});
@@ -169,7 +170,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
                       children: [
                         Text(
                           '${filteredEvents.length} eventos encontrados',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
                         ),
                       ],
                     ),
@@ -185,7 +186,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.search_off,
-                                    size: 80, color: Colors.grey[300]),
+                                    size: 80, color: Theme.of(context).colorScheme.skeletonBackground),
                                 const SizedBox(height: 20),
                                 const Text(
                                   'No se encontraron eventos',
@@ -261,10 +262,10 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
           });
           await _loadEvents();
         },
-        backgroundColor: Colors.white,
-        selectedColor: const Color(0xFF1976D2).withValues(alpha: 51),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 51),
         labelStyle: TextStyle(
-          color: selected ? Colors.white : Colors.black87,
+          color: selected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           fontSize: 14,
         ),
@@ -272,7 +273,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
             color: selected
-                ? const Color(0xFF1976D2)
+                ? Theme.of(context).colorScheme.primary
                 : Colors.grey.shade300,
           ),
         ),
@@ -315,10 +316,11 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
+                          final scheme = Theme.of(context).colorScheme;
                           return Container(
                             width: 80,
                             height: 80,
-                            color: Colors.grey[200],
+                            color: scheme.skeletonBackground,
                             child: const Center(
                               child: SizedBox(
                                 width: 20,
@@ -333,19 +335,20 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
                           if (kDebugMode) {
                             debugPrint('Error cargando imagen: $error');
                           }
+                          final scheme = Theme.of(context).colorScheme;
                           return Container(
                             width: 80,
                             height: 80,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.event, color: Colors.grey),
+                            color: scheme.skeletonBackground,
+                            child: Icon(Icons.event, color: scheme.secondaryText),
                           );
                         },
                       )
                     : Container(
                         width: 80,
                         height: 80,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.event, color: Colors.grey),
+                        color: Theme.of(context).colorScheme.skeletonBackground,
+                        child: Icon(Icons.event, color: Theme.of(context).colorScheme.secondaryText),
                       ),
               ),
               const SizedBox(width: 16),

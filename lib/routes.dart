@@ -33,15 +33,30 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/notifications': (context) => NotificationsScreen(),
   '/admin': (context) => AdminPanelScreen(),
   '/event-detail': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    return EventDetailScreen(eventId: args as String);
+    final args = ModalRoute.of(context)?.settings.arguments as String?;
+    if (args == null) {
+      return const Scaffold(
+        body: Center(child: Text('Error: ID de evento no proporcionado')),
+      );
+    }
+    return EventDetailScreen(eventId: args);
   },
   '/edit-event': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    return EditEventScreen(eventId: args as String);
+    final args = ModalRoute.of(context)?.settings.arguments as String?;
+    if (args == null) {
+      return const Scaffold(
+        body: Center(child: Text('Error: ID de evento no proporcionado')),
+      );
+    }
+    return EditEventScreen(eventId: args);
   },
   '/attendees': (context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    return AttendeesScreen(eventId: args as String);
+    final args = ModalRoute.of(context)?.settings.arguments as String?;
+    if (args == null) {
+      return const Scaffold(
+        body: Center(child: Text('Error: ID de evento no proporcionado')),
+      );
+    }
+    return AttendeesScreen(eventId: args);
   },
 };

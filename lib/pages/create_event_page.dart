@@ -200,6 +200,11 @@ class _CreateEventPageState extends State<CreateEventPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              EventImageUploader(
+                imageUrl: _imageUrl,
+                onUpload: (url) => setState(() => _imageUrl = url),
+              ),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: 'Nombre del evento'),
@@ -209,7 +214,12 @@ class _CreateEventPageState extends State<CreateEventPage> {
               TextFormField(
                 controller: _descCtrl,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Descripción'),
+                textAlignVertical: TextAlignVertical.top,
+                decoration: const InputDecoration(
+                  labelText: 'Escribe los detalles del evento aquí...',
+                  alignLabelWithHint: true,
+                  floatingLabelAlignment: FloatingLabelAlignment.start,
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -280,21 +290,24 @@ class _CreateEventPageState extends State<CreateEventPage> {
                 }).toList(),
               ),
               const SizedBox(height: 12),
-              EventImageUploader(
-                imageUrl: _imageUrl,
-                onUpload: (url) => setState(() => _imageUrl = url),
-                width: 150,
-                height: 90,
-                buttonLabel: 'Seleccionar imagen',
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Crear evento'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      label: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _submitting ? null : _submit,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Crear evento'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

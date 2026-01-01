@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final String eventId;
@@ -137,6 +138,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    
     if (_loading) {
       return _buildDetailSkeleton();
     }
@@ -172,17 +175,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 height: 220,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
+                    width: double.infinity,
                     height: 220,
-                    color: Colors.grey[300],
-                    child: const Center(child: Icon(Icons.event, size: 60)),
+                    color: scheme.skeletonBackground,
+                    child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
                   );
                 },
               )
             else
               Container(
+                width: double.infinity,
                 height: 220,
-                color: Colors.grey[300],
-                child: const Center(child: Icon(Icons.event, size: 60)),
+                color: scheme.skeletonBackground,
+                child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
               ),
 
             Padding(
@@ -201,9 +206,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: scheme.infoCardBackground,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100),
+                      border: Border.all(color: scheme.infoCardBorder),
                     ),
                     child: Column(
                       children: [
@@ -213,24 +218,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: scheme.iconContainerBackground,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.calendar_today, color: Color(0xFF1976D2), size: 24),
+                              child: Icon(Icons.calendar_today, color: scheme.primary, size: 24),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Fecha y hora',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    style: TextStyle(fontSize: 12, color: scheme.secondaryText),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     dateTime,
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
                                   ),
                                 ],
                               ),
@@ -238,7 +243,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Divider(color: Colors.blue.shade200, thickness: 1),
+                        Divider(color: scheme.dividerColor, thickness: 1),
                         const SizedBox(height: 16),
                         // Ubicación
                         Row(
@@ -246,24 +251,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: scheme.iconContainerBackground,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.location_on, color: Color(0xFF1976D2), size: 24),
+                              child: Icon(Icons.location_on, color: scheme.primary, size: 24),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Ubicación',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    style: TextStyle(fontSize: 12, color: scheme.secondaryText),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     location ?? 'Sin ubicación',
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -285,7 +290,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 8),
                   Text(
                     description.isEmpty ? 'No hay descripción disponible' : description,
-                    style: const TextStyle(fontSize: 15, color: Colors.grey, height: 1.5),
+                    style: TextStyle(fontSize: 15, color: scheme.secondaryText, height: 1.5),
                   ),
                   const SizedBox(height: 24),
 
@@ -299,25 +304,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: scheme.infoCardBackground,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade100),
+                        border: Border.all(color: scheme.infoCardBorder),
                       ),
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: scheme.iconContainerBackground,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.person, color: Color(0xFF1976D2), size: 24),
+                            child: Icon(Icons.person, color: scheme.primary, size: 24),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               organizer,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
                             ),
                           ),
                         ],

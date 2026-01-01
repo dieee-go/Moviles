@@ -22,27 +22,62 @@ class _AvatarState extends State<Avatar> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        if (widget.imageUrl == null || widget.imageUrl!.isEmpty)
-          Container(
-            width: 150,
-            height: 150,
-            color: Colors.grey,
-            child: const Center(
-              child: Text('No Image'),
+        // Avatar circular
+        Container(
+          width: 150,
+          height: 150,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+              width: 2,
             ),
-          )
-        else
-          Image.network(
-            widget.imageUrl!,
-            width: 150,
-            height: 150,
-            fit: BoxFit.cover,
           ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _upload,
-          child: const Text('Upload'),
+          child: ClipOval(
+            child: widget.imageUrl == null || widget.imageUrl!.isEmpty
+                ? Container(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.person,
+                      size: 60,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : Image.network(
+                    widget.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.person,
+                        size: 60,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        // Botón de edición en la esquina inferior derecha
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: FloatingActionButton.small(
+            onPressed: _isLoading ? null : _upload,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.edit, color: Colors.white),
+          ),
         ),
       ],
     );

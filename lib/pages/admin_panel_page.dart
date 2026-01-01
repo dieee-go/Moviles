@@ -62,7 +62,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
       final data = await supabase
           .from('role_requests')
-          .select('id, user_id, status, created_at, updated_at, reason, profiles(name, email, role)')
+          .select('id, user_id, status, created_at, updated_at, profiles(nombre, primer_apellido, email, role)')
           .eq('status', 'pending')
           .order('created_at');
 
@@ -181,11 +181,12 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       itemBuilder: (context, index) {
         final r = _requests[index];
         final profile = r['profiles'] as Map<String, dynamic>?;
-        final name = profile?['name'] as String? ?? 'Sin nombre';
+        final nombre = profile?['nombre'] as String? ?? '';
+        final apellido = profile?['primer_apellido'] as String? ?? '';
+        final fullName = [nombre, apellido].where((s) => s.isNotEmpty).join(' ').isEmpty ? 'Sin nombre' : [nombre, apellido].where((s) => s.isNotEmpty).join(' ');
         final email = profile?['email'] as String? ?? 'Sin correo';
         final status = r['status'] as String? ?? '';
         final created = _formatDate(r['created_at'] as String?);
-        final reason = r['reason'] as String?;
         final isBusy = _processingId == r['id'];
 
         return Card(
@@ -202,7 +203,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
                           Text(email, style: const TextStyle(color: Colors.grey)),
                         ],
@@ -215,10 +216,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (reason != null && reason.isNotEmpty) ...[
-                  Text(reason),
-                  const SizedBox(height: 8),
-                ],
                 Text('Solicitado: $created', style: const TextStyle(color: Colors.grey)),
                 const SizedBox(height: 12),
                 Row(

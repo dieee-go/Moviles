@@ -139,15 +139,31 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                 decoration: const InputDecoration(labelText: "Carrera/Departamento"),
               ),
               const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _saving ? null : _saveProfile,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: Colors.blue,
-                ),
-                child: _saving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Guardar Cambios"),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _saving ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child: const Text("Cancelar"),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _saveProfile,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: _saving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text("Guardar Cambios"),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

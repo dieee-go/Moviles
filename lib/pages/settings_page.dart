@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
+import '../theme/app_theme_extensions.dart';
 import 'admin_panel_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -348,14 +349,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _leadingIcon(IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F2FC),
+        color: scheme.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: const Color(0xFF1976D2)),
+      child: Icon(icon, color: scheme.primary),
     );
   }
 
@@ -375,8 +377,9 @@ class _SettingsPageState extends State<SettingsPage> {
         value: value,
         thumbColor: WidgetStateProperty.all(Colors.white),
         trackColor: WidgetStateProperty.resolveWith((states) {
+          final scheme = Theme.of(context).colorScheme;
           if (states.contains(WidgetState.selected)) {
-            return const Color(0xFF1976D2);
+            return scheme.primary;
           }
           return Colors.grey[400];
         }),
@@ -391,6 +394,7 @@ class _SettingsPageState extends State<SettingsPage> {
     Color? titleColor,
     VoidCallback? onTap,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       leading: _leadingIcon(icon),
       title: Text(
@@ -398,10 +402,10 @@ class _SettingsPageState extends State<SettingsPage> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: titleColor ?? Colors.black87,
+          color: titleColor ?? scheme.onSurface,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      trailing: Icon(Icons.chevron_right, color: scheme.secondaryText),
       onTap: onTap,
     );
   }
