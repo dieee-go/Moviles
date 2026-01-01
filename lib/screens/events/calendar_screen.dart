@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -153,8 +154,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final selectedDayEvents = _getEventsForDay(_selectedDay);
     final monthName = DateFormat('MMMM yyyy', 'es_ES').format(_focusedDay);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: scheme.alternativeSurface,
       appBar: AppBar(
         title: const Text('Calendario de Eventos'),
         centerTitle: true,
@@ -165,7 +168,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           // Header del mes
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.white,
+            color: scheme.surface,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -187,16 +190,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           // Días de la semana
           Container(
-            color: Colors.white,
+            color: scheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: ['L', 'M', 'X', 'J', 'V', 'S', 'D']
                   .map((day) => Text(
                         day,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey,
+                          color: scheme.secondaryText,
                           fontSize: 12,
                         ),
                       ))
@@ -206,7 +209,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           // Calendario
           Container(
-            color: Colors.white,
+            color: scheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: GridView.builder(
               shrinkWrap: true,
@@ -234,13 +237,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF1976D2)
+                          ? scheme.primary
                           : isToday
-                              ? const Color(0xFF1976D2).withValues(alpha: 0.2)
+                              ? scheme.primary.withValues(alpha: 0.2)
                               : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: isCurrentMonth && hasEvents
-                          ? Border.all(color: const Color(0xFF1976D2), width: 2)
+                          ? Border.all(color: scheme.primary, width: 2)
                           : null,
                     ),
                     child: Stack(
@@ -257,8 +260,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 color: isSelected
                                     ? Colors.white
                                     : !isCurrentMonth
-                                        ? Colors.grey[300]
-                                        : Colors.black87,
+                                        ? (isDark ? Colors.grey[600] : Colors.grey[300])
+                                        : (isDark ? Colors.white : Colors.black87),
                               ),
                             ),
                             if (hasEvents)
@@ -267,7 +270,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 width: 4,
                                 height: 4,
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Colors.white : const Color(0xFF1976D2),
+                                  color: isSelected ? Colors.white : scheme.primary,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -294,10 +297,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           Expanded(
             child: selectedDayEvents.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No hay eventos este día',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: scheme.secondaryText),
                     ),
                   )
                 : ListView.builder(
@@ -335,19 +338,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     height: 60,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
+                                      final scheme = Theme.of(context).colorScheme;
                                       return Container(
                                         width: 60,
                                         height: 60,
-                                        color: Colors.grey[300],
-                                        child: const Icon(Icons.event, color: Colors.grey),
+                                        color: scheme.skeletonBackground,
+                                        child: Icon(Icons.event, color: scheme.secondaryText),
                                       );
                                     },
                                   )
                                 : Container(
                                     width: 60,
                                     height: 60,
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.event, color: Colors.grey),
+                                    color: Theme.of(context).colorScheme.skeletonBackground,
+                                    child: Icon(Icons.event, color: Theme.of(context).colorScheme.secondaryText),
                                   ),
                           ),
                           title: Text(
@@ -361,7 +365,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 eventTime,
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey),
                               ),
                               if (location != null) ...[
                                 const SizedBox(height: 2),
@@ -369,12 +373,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   location,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey),
                                 ),
                               ],
                             ],
                           ),
-                          trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                          trailing: Icon(Icons.chevron_right, color: isDark ? Colors.grey[500] : Colors.grey),
                           onTap: () {
                             final id = event['id'];
                             if (id != null) {

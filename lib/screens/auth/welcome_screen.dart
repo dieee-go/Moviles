@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -14,14 +15,14 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: 120,
                   height: 120,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1976D2),
-                    borderRadius: BorderRadius.circular(24),
+                  child: SvgPicture.asset(
+                    'assets/images/unieventos_icon.svg',
+                    fit: BoxFit.contain,
+                    semanticsLabel: 'UniEventos',
                   ),
-                  child: const Icon(Icons.school, size: 64, color: Colors.white),
                 ),
                 const SizedBox(height: 32),
                 const Text(

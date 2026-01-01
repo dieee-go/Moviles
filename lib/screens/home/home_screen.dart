@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 import '../events/explore_events_screen.dart';
 import '../events/my_events_screen.dart';
 import '../events/calendar_screen.dart';
@@ -217,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Icon(
                           (item.icon as Icon).icon,
-                          color: isActive ? scheme.primary : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                          color: isActive ? scheme.primary : scheme.secondaryText,
                           size: 24,
                         ),
                         const SizedBox(height: 2),
@@ -225,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           item.label ?? '',
                           style: TextStyle(
                             fontSize: 10,
-                            color: isActive ? scheme.primary : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                            color: isActive ? scheme.primary : scheme.secondaryText,
                             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                           ),
                         ),

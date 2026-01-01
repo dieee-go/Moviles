@@ -3,6 +3,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
+import '../../utils/translations.dart';
+
+// Función global para traducir roles
+String _translateRole(String role) {
+  return translateRole(role);
+}
+
+// Función global para traducir estados
+String _translateStatus(String status) {
+  return translateEventStatus(status);
+}
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -374,7 +386,7 @@ class _UsersTab extends StatelessWidget {
                   if (showDemote)
                     const PopupMenuItem(value: 'student', child: Text('Revocar rol')),
                 ],
-                child: Chip(label: Text(role)),
+                child: Chip(label: Text(_translateRole(role))),
               ),
             ),
           );
@@ -444,7 +456,7 @@ class _EventsTab extends StatelessWidget {
             child: ListTile(
               title: Text(name),
               subtitle: Text(dateLabel),
-              trailing: Chip(label: Text(status.isEmpty ? 'Activo' : status)),
+              trailing: Chip(label: Text(_translateStatus(status.isEmpty ? '' : status))),
             ),
           );
         },
@@ -593,7 +605,7 @@ class _RequestsSheetState extends State<_RequestsSheet> {
             Container(
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.skeletonBackground,
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
@@ -630,7 +642,7 @@ class _RequestsSheetState extends State<_RequestsSheet> {
                                             Text(email, style: const TextStyle(color: Colors.grey)),
                                           ],
                                         ),
-                                        Chip(label: Text((r['status'] as String? ?? 'pending'))),
+                                        Chip(label: Text(_translateStatus(r['status'] as String? ?? 'pending'))),
                                       ],
                                     ),
                                     if (msg.isNotEmpty) ...[

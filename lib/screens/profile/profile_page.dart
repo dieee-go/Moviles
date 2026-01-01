@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/avatar.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 import '../../pages/login_page.dart';
 import '../../pages/settings_page.dart';
 import 'edit_profile_screen.dart';
@@ -134,8 +135,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surface : Colors.grey[100],
       appBar: AppBar(
         title: const Text('Mi Perfil'),
         centerTitle: true,
@@ -166,10 +169,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 20),
                   Text(
                     _nombreCompleto,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (_roleLabel.isNotEmpty) ...[
@@ -178,7 +181,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       _roleLabel,
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.grey[700],
+                        color: scheme.secondaryText,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -234,6 +237,7 @@ class _ProfileField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -243,16 +247,16 @@ class _ProfileField extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: scheme.secondaryText,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w400,
             ),
           ),

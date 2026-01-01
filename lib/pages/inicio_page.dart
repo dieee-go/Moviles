@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
 import '../screens/notifications/notifications_screen.dart';
+import '../theme/app_theme_extensions.dart';
 
 class InicioPage extends StatefulWidget {
   const InicioPage({super.key});
@@ -127,10 +128,11 @@ class _InicioPageState extends State<InicioPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: scheme.alternativeSurface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         title: Row(
           children: [
@@ -138,16 +140,16 @@ class _InicioPageState extends State<InicioPage> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF1976D2),
+                color: scheme.primary,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.school, color: Colors.white, size: 24),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               'UniEventos',
               style: TextStyle(
-                color: Colors.black87,
+                color: scheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -445,9 +447,10 @@ class _InicioPageState extends State<InicioPage> {
                       fit: BoxFit.cover,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
+                        final scheme = Theme.of(context).colorScheme;
                         return Container(
                           height: 140,
-                          color: Colors.grey[200],
+                          color: scheme.skeletonBackground,
                           child: const Center(child: CircularProgressIndicator()),
                         );
                       },
@@ -455,19 +458,20 @@ class _InicioPageState extends State<InicioPage> {
                         if (kDebugMode) {
                           debugPrint('Error cargando imagen: $error');
                         }
+                        final scheme = Theme.of(context).colorScheme;
                         return Container(
                           height: 140,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.event, size: 48, color: Colors.grey),
+                          color: scheme.skeletonBackground,
+                          child: Icon(Icons.event, size: 48, color: scheme.secondaryText),
                         );
                       },
                     )
                   : Container(
                       height: 140,
                       width: double.infinity,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.event, size: 48, color: Colors.grey),
+                      color: Theme.of(context).colorScheme.skeletonBackground,
+                      child: Center(
+                        child: Icon(Icons.event, size: 48, color: Theme.of(context).colorScheme.secondaryText),
                       ),
                     ),
             ),
@@ -501,7 +505,7 @@ class _InicioPageState extends State<InicioPage> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1976D2),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -519,6 +523,7 @@ class _InicioPageState extends State<InicioPage> {
   }
 
   Widget _buildCategoryChip(String label, String? categoryId) {
+    final scheme = Theme.of(context).colorScheme;
     final selected = _selectedCategoryId == categoryId;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -526,17 +531,17 @@ class _InicioPageState extends State<InicioPage> {
         label: Text(label),
         selected: selected,
         onSelected: (v) => _filterByCategory(v ? categoryId : null),
-        backgroundColor: Colors.white,
-        selectedColor: const Color(0xFF1976D2).withValues(alpha: 51),
+        backgroundColor: scheme.surface,
+        selectedColor: scheme.primary.withValues(alpha: 0.2),
         labelStyle: TextStyle(
-          color: selected ? Colors.white : Colors.black87,
+          color: selected ? scheme.primary : scheme.onSurface,
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           fontSize: 14,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: selected ? const Color(0xFF1976D2) : Colors.grey.shade300,
+            color: selected ? scheme.primary : scheme.secondaryText.withValues(alpha: 0.3),
           ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -568,10 +573,11 @@ class _InicioPageState extends State<InicioPage> {
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
+                      final scheme = Theme.of(context).colorScheme;
                       return Container(
                         width: 80,
                         height: 80,
-                        color: Colors.grey[200],
+                        color: scheme.skeletonBackground,
                         child: const Center(
                           child: SizedBox(
                             width: 20,
@@ -585,19 +591,20 @@ class _InicioPageState extends State<InicioPage> {
                       if (kDebugMode) {
                         debugPrint('Error cargando imagen: $error');
                       }
+                      final scheme = Theme.of(context).colorScheme;
                       return Container(
                         width: 80,
                         height: 80,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.event, color: Colors.grey),
+                        color: scheme.skeletonBackground,
+                        child: Icon(Icons.event, color: scheme.secondaryText),
                       );
                     },
                   )
                 : Container(
                     width: 80,
                     height: 80,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.event, color: Colors.grey),
+                    color: Theme.of(context).colorScheme.skeletonBackground,
+                    child: Icon(Icons.event, color: Theme.of(context).colorScheme.secondaryText),
                   ),
           ),
           title: Text(

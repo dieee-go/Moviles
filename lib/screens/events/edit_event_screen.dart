@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class EditEventScreen extends StatefulWidget {
   final String eventId;
@@ -223,6 +224,40 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
+  Future<void> _cancelEvent() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar evento'),
+        content: const Text('¿Estás seguro de que deseas cancelar este evento?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await supabase.from('events').update({
+        'status': 'cancelled',
+      }).eq('id', widget.eventId);
+      if (mounted) {
+        context.showSnackBar('Evento cancelado');
+        Navigator.pop(context);
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) context.showSnackBar('Error: ${e.message}', isError: true);
+    }
+  }
+
   String _formatLongDate(DateTime d) {
     const days = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
     const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -286,14 +321,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
                               height: 180,
                               errorBuilder: (context, error, stackTrace) => Container(
                                 height: 180,
-                                color: Colors.grey[300],
+                                color: Theme.of(context).colorScheme.skeletonBackground,
                                 alignment: Alignment.center,
                                 child: const Icon(Icons.image_not_supported),
                               ),
                             )
                           : Container(
                               height: 180,
-                              color: Colors.grey[300],
+                              color: Theme.of(context).colorScheme.skeletonBackground,
                               alignment: Alignment.center,
                               child: const Icon(Icons.image, size: 48),
                             ),
@@ -449,6 +484,22 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       child: const Text('Guardar Cambios', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _cancelEvent,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: const BorderSide(color: Colors.orange),
+                      ),
+                      child: const Text(
+                        'Cancelar Evento',
+                        style: TextStyle(color: Colors.orange, fontSize: 16),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
