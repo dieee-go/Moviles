@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'com.example.prueba1://reset-callback/',
+        redirectTo: 'com.example.unieventos://reset-callback/',
       );
       if (mounted) {
         context.showSnackBar(

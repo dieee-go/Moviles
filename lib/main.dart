@@ -48,24 +48,23 @@ class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
   ThemeData _buildLightTheme() {
-    return ThemeData.light().copyWith(
-      primaryColor: const Color(0xFF1976D2),
-      scaffoldBackgroundColor: Colors.white,
-      colorScheme: const ColorScheme.light(
-        primary: Color(0xFF1976D2),
-        secondary: Color(0xFF42A5F5),
-        surface: Colors.white,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1976D2),
-        foregroundColor: Colors.white,
+    const seed = Color(0xFF1976D2);
+    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light);
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         elevation: 0,
         centerTitle: true,
+        iconTheme: IconThemeData(color: scheme.onPrimary),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          foregroundColor: Colors.white,
-          backgroundColor: const Color(0xFF1976D2),
+          foregroundColor: scheme.onPrimary,
+          backgroundColor: scheme.primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -74,7 +73,7 @@ class _MyAppState extends State<MyApp> {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFF1976D2),
+          foregroundColor: scheme.primary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -83,42 +82,40 @@ class _MyAppState extends State<MyApp> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const Color(0xFF1976D2);
+            return scheme.primary;
           }
           return null;
         }),
       ),
-      cardColor: Colors.white,
+      cardColor: scheme.surface,
       snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
     );
   }
 
   ThemeData _buildDarkTheme() {
-    const primary = Color(0xFF90CAF9);
-    return ThemeData.dark().copyWith(
-      primaryColor: primary,
-      scaffoldBackgroundColor: const Color(0xFF121212),
-      colorScheme: const ColorScheme.dark(
-        primary: primary,
-        secondary: Color(0xFF64B5F6),
-        surface: Color(0xFF1E1E1E),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
+    const seed = Color(0xFF1976D2);
+    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         elevation: 0,
         centerTitle: true,
+        iconTheme: IconThemeData(color: scheme.onPrimary),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          foregroundColor: Colors.black,
-          backgroundColor: primary,
+          foregroundColor: scheme.onPrimary,
+          backgroundColor: scheme.primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -127,7 +124,7 @@ class _MyAppState extends State<MyApp> {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: primary,
+          foregroundColor: scheme.primary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -136,22 +133,22 @@ class _MyAppState extends State<MyApp> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: primary, width: 2),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return primary;
+            return scheme.primary;
           }
           return null;
         }),
       ),
-      cardColor: const Color(0xFF1E1E1E),
-      snackBarTheme: const SnackBarThemeData(
+      cardColor: scheme.surface,
+      snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Color(0xFF2C2C2C),
-        contentTextStyle: TextStyle(color: Colors.white),
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: TextStyle(color: scheme.onInverseSurface),
       ),
     );
   }
