@@ -64,15 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (role == 'admin') {
       _pages = [
         InicioScreen(),
-        AdminPanelScreen(),
         ExploreEventsScreen(),
+        AdminPanelScreen(),
         const CalendarScreen(),
         const ProfilePage(),
       ];
       _navItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-        BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Admin'),
         BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explorar'),
+        BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Admin'),
         BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendario'),
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
       ];

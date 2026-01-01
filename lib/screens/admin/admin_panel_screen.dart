@@ -20,10 +20,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   final List<Map<String, dynamic>> _organizers = [];
   final List<Map<String, dynamic>> _events = [];
 
-  bool _loadingUsers = true;
-  bool _loadingOrganizers = true;
-  bool _loadingEvents = true;
-  bool _loadingReports = true;
+  bool _loadingUsers = false;
+  bool _loadingOrganizers = false;
+  bool _loadingEvents = false;
+  bool _loadingReports = false;
 
   bool _hasMoreUsers = true;
   bool _hasMoreOrganizers = true;
@@ -61,7 +61,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   }
 
   Future<void> _loadUsers({bool reset = false}) async {
-    if (_loadingUsers) return;
+    if (_loadingUsers && !reset) return;
     setState(() => _loadingUsers = true);
     if (reset) {
       _users.clear();
@@ -88,7 +88,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   }
 
   Future<void> _loadOrganizers({bool reset = false}) async {
-    if (_loadingOrganizers) return;
+    if (_loadingOrganizers && !reset) return;
     setState(() => _loadingOrganizers = true);
     if (reset) {
       _organizers.clear();
@@ -116,7 +116,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   }
 
   Future<void> _loadEvents({bool reset = false}) async {
-    if (_loadingEvents) return;
+    if (_loadingEvents && !reset) return;
     setState(() => _loadingEvents = true);
     if (reset) {
       _events.clear();
@@ -308,6 +308,24 @@ class _UsersTab extends StatelessWidget {
     final hasHeader = header != null;
     final itemCount = data.length + 1 + (hasHeader ? 1 : 0);
 
+    if (loading && data.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(12),
+          children: [
+            if (hasHeader)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: header,
+              ),
+            Skeletons.listTiles(count: 6, leadingSize: 44),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.builder(
@@ -379,6 +397,17 @@ class _EventsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading && data.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(12),
+          child: Skeletons.listTiles(count: 6, leadingSize: 52),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.builder(
