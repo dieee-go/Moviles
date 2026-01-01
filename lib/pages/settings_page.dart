@@ -20,12 +20,23 @@ class _SettingsPageState extends State<SettingsPage> {
   String? _requestStatus;
   DateTime? _requestUpdatedAt;
   String? _profileRole;
+  ThemeMode _themeMode = ThemeMode.light;
 
   @override
   void initState() {
     super.initState();
     _loadUserRole();
     _loadRequestStatus();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = ThemeController.of(context);
+    final mode = controller?.themeMode ?? ThemeMode.light;
+    if (_themeMode != mode) {
+      setState(() => _themeMode = mode);
+    }
   }
 
   Future<void> _loadUserRole() async {
@@ -315,16 +326,20 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _sectionCard({required List<Widget> children}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shadowColor = isDark
+      ? Colors.black.withValues(alpha: 90) // 35% of 255 ≈ 90
+      : const Color(0x0D000000);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: shadowColor,
+            blurRadius: isDark ? 14 : 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -391,6 +406,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  void _toggleDarkMode(bool value) {
+    final controller = ThemeController.of(context);
+    final mode = value ? ThemeMode.dark : ThemeMode.light;
+    controller?.setThemeMode(mode);
+    setState(() => _themeMode = mode);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -401,6 +423,18 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
+          _sectionTitle('Apariencia'),
+          _sectionCard(
+            children: [
+              _switchTile(
+                icon: Icons.dark_mode_outlined,
+                title: 'Modo oscuro',
+                value: _themeMode == ThemeMode.dark,
+                onChanged: _toggleDarkMode,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           _sectionTitle('Notificaciones'),
           _sectionCard(
             children: [

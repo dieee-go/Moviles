@@ -50,15 +50,15 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
   }
 
   Future<void> _loadEvents() async {
+    setState(() => _loading = true);
     try {
-      final query = supabase
-          .from('events')
-          .select('id, name, image_url, event_datetime, location_id, locations(name)');
+          final query = supabase.from('events').select(
+            'id, name, image_url, event_datetime, location_id, locations(name), event_interests!inner(interest_id)');
 
-      // Filtrar por categoría si está seleccionada
-      final data = _selectedCategoryId == null
+        // Filtrar por categoría si está seleccionada (inner join para asegurar la relación)
+        final data = _selectedCategoryId == null
           ? await query.order('event_datetime', ascending: false)
-          : await query
+            : await query
               .eq('event_interests.interest_id', _selectedCategoryId!)
               .order('event_datetime', ascending: false);
 
@@ -69,6 +69,8 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
       if (mounted) {
         context.showSnackBar('Error: ${e.message}', isError: true);
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -262,7 +264,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
         backgroundColor: Colors.white,
         selectedColor: const Color(0xFF1976D2).withValues(alpha: 51),
         labelStyle: TextStyle(
-          color: selected ? const Color(0xFF1976D2) : Colors.black87,
+          color: selected ? Colors.white : Colors.black87,
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           fontSize: 14,
         ),
