@@ -1,6 +1,6 @@
 {
-    "name": "prueba1",
-    "short_name": "prueba1",
+    "name": "unieventos",
+    "short_name": "unieventos",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

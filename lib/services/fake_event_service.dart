@@ -1,4 +1,4 @@
-import 'package:prueba1/services/fake_user_service.dart';
+import 'package:unieventos/services/fake_user_service.dart';
 
 class FakeEventService {
   static final List<Map<String, dynamic>> _events = [

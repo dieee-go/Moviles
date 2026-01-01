@@ -156,6 +156,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_loadingRole) {
       return _buildHomeSkeleton();
     }
@@ -166,20 +168,20 @@ class _HomeScreenState extends State<HomeScreen> {
           : _pages[_currentIndex],
       floatingActionButton: FloatingActionButton(
         onPressed: _onFabPressed,
-        backgroundColor: const Color(0xFF1976D2),
+        backgroundColor: scheme.primary,
         child: Icon(
           _userRole == 'organizer' || _userRole == 'admin'
               ? Icons.add
               : Icons.qr_code_scanner,
           size: 28,
-          color: Colors.white,
+          color: scheme.onPrimary,
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 12,
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 8,
         child: SizedBox(
           height: 65,
@@ -215,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Icon(
                           (item.icon as Icon).icon,
-                          color: isActive ? const Color(0xFF1976D2) : Colors.grey[600],
+                          color: isActive ? scheme.primary : (isDark ? Colors.grey[400] : Colors.grey[600]),
                           size: 24,
                         ),
                         const SizedBox(height: 2),
@@ -223,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           item.label ?? '',
                           style: TextStyle(
                             fontSize: 10,
-                            color: isActive ? const Color(0xFF1976D2) : Colors.grey[600],
+                            color: isActive ? scheme.primary : (isDark ? Colors.grey[400] : Colors.grey[600]),
                             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                           ),
                         ),

@@ -32,7 +32,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: kIsWeb ? null : 'com.example.prueba1://login-callback/',
+        redirectTo: kIsWeb ? null : 'com.example.unieventos://login-callback/',
       );
       if (mounted) {
         context.showSnackBar('Hemos enviado un correo para recuperar tu contraseña.');

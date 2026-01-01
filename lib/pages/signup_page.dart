@@ -158,7 +158,7 @@ class _SignupPageState extends State<SignupPage> {
         },
         emailRedirectTo: kIsWeb
             ? null
-            : 'com.example.prueba1://login-callback/',
+            : 'com.example.unieventos://login-callback/',
       );
 
       final user = response.user;
