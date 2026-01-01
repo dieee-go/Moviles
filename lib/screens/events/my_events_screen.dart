@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../utils/translations.dart';
 
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
@@ -30,9 +31,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         return;
       }
 
+      // Primero actualizar eventos que ya han pasado
+      await _updateFinishedEvents(userId);
+
       final data = await supabase
           .from('events')
-          .select('id, name, event_datetime, locations(name)')
+          .select('id, name, event_datetime, status, locations(name)')
           .eq('organizer_id', userId)
           .order('event_datetime', ascending: false);
 
@@ -48,11 +52,67 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     }
   }
 
-  bool _isEventActive(String? dateStr) {
-    if (dateStr == null) return false;
-    final dt = DateTime.tryParse(dateStr)?.toLocal();
-    if (dt == null) return false;
-    return dt.isAfter(DateTime.now());
+  Future<void> _updateFinishedEvents(String userId) async {
+    try {
+      final now = DateTime.now().toUtc();
+
+      // Obtener todos los eventos activos del usuario
+      final activeEvents = await supabase
+          .from('events')
+          .select('id, event_datetime')
+          .eq('organizer_id', userId)
+          .eq('status', 'active');
+
+      // Verificar cuáles han pasado y actualizar
+      for (final event in activeEvents) {
+        final eventDateTime = event['event_datetime'] as String?;
+        if (eventDateTime == null) continue;
+
+        final eventTime = DateTime.parse(eventDateTime).toLocal();
+        if (eventTime.isBefore(now)) {
+          // El evento ya pasó, actualizar a 'done'
+          await supabase
+              .from('events')
+              .update({'status': 'done'})
+              .eq('id', event['id']);
+        }
+      }
+    } catch (e) {
+      // Silenciar errores de actualización para no interrumpir la carga
+      if (mounted) {
+        // Opcionalmente log el error
+      }
+    }
+  }
+
+  Map<String, dynamic> _getStatusStyle(String? status) {
+    final statusLower = status?.toLowerCase() ?? 'active';
+    switch (statusLower) {
+      case 'active':
+        return {
+          'color': Colors.blue[100],
+          'iconColor': Colors.blue,
+          'icon': Icons.schedule,
+        };
+      case 'done':
+        return {
+          'color': Colors.green[100],
+          'iconColor': Colors.green,
+          'icon': Icons.check_circle,
+        };
+      case 'cancelled':
+        return {
+          'color': Colors.red[100],
+          'iconColor': Colors.red,
+          'icon': Icons.cancel,
+        };
+      default:
+        return {
+          'color': Colors.blue[100],
+          'iconColor': Colors.blue,
+          'icon': Icons.schedule,
+        };
+    }
   }
 
   String _formatDateTime(String? dateStr) {
@@ -158,23 +218,31 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                       final eventId = event['id'] as String;
                       final name = event['name'] as String? ?? 'Sin título';
                       final dateTime = event['event_datetime'] as String?;
-                      final isActive = _isEventActive(dateTime);
+                      final statusStr = event['status'] as String? ?? 'active';
                       final locationData = event['locations'];
                       final location = locationData != null ? locationData['name'] as String? : null;
+                      final statusStyle = _getStatusStyle(statusStr);
 
                       return Card(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: ListTile(
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/event-detail',
+                              arguments: eventId,
+                            );
+                          },
                           leading: Container(
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: isActive ? Colors.green[100] : Colors.red[100],
+                              color: statusStyle['color'] as Color?,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              isActive ? Icons.check_circle : Icons.cancel,
-                              color: isActive ? Colors.green : Colors.red,
+                              statusStyle['icon'] as IconData?,
+                              color: statusStyle['iconColor'] as Color?,
                             ),
                           ),
                           title: Text(
@@ -200,9 +268,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                               ],
                               const SizedBox(height: 2),
                               Text(
-                                isActive ? 'Activo' : 'Finalizado',
+                                translateEventStatus(statusStr),
                                 style: TextStyle(
-                                  color: isActive ? Colors.green : Colors.red,
+                                  color: statusStyle['iconColor'] as Color?,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

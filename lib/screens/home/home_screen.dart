@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
 import '../../theme/app_theme_extensions.dart';
-import '../events/explore_events_screen.dart';
-import '../events/my_events_screen.dart';
-import '../events/calendar_screen.dart';
-import '../profile/profile_page.dart';
-import '../admin/admin_panel_screen.dart';
-import 'inicio_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userRole;
   bool _loadingRole = true;
 
-  List<Widget> _pages = [];
+  List<String> _pageRoutes = [];
   List<BottomNavigationBarItem> _navItems = [];
 
   @override
@@ -63,12 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _setupNavigation(String? role) {
     if (role == 'admin') {
-      _pages = [
-        InicioScreen(),
-        ExploreEventsScreen(),
-        AdminPanelScreen(),
-        const CalendarScreen(),
-        const ProfilePage(),
+      _pageRoutes = [
+        '/inicio',
+        '/explore',
+        '/admin',
+        '/calendar',
+        '/profile',
       ];
       _navItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
@@ -78,12 +72,12 @@ class _HomeScreenState extends State<HomeScreen> {
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
       ];
     } else if (role == 'organizer') {
-      _pages = [
-        InicioScreen(),
-        ExploreEventsScreen(),
-        MyEventsScreen(),
-        const CalendarScreen(),
-        const ProfilePage(),
+      _pageRoutes = [
+        '/inicio',
+        '/explore',
+        '/my-events',
+        '/calendar',
+        '/profile',
       ];
       _navItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
@@ -94,11 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
     } else {
       // Estudiante o sin rol
-      _pages = [
-        InicioScreen(),
-        ExploreEventsScreen(),
-        const CalendarScreen(),
-        const ProfilePage(),
+      _pageRoutes = [
+        '/inicio',
+        '/explore',
+        '/calendar',
+        '/profile',
       ];
       _navItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
@@ -113,9 +107,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_userRole == 'organizer' || _userRole == 'admin') {
       Navigator.pushNamed(context, '/create-event');
     } else {
-      // Escáner QR para estudiantes
-      context.showSnackBar('Escanear QR próximamente');
+      // Escanear QR para estudiantes
+      Navigator.pushNamed(context, '/qr-scan');
     }
+  }
+
+  void _onNavItemTapped(int index) {
+    setState(() => _currentIndex = index);
+    Navigator.pushNamed(context, _pageRoutes[index]);
   }
 
   Scaffold _buildHomeSkeleton() {
@@ -164,9 +163,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      body: _pages.isEmpty
-          ? const Center(child: Text('Error cargando navegación'))
-          : _pages[_currentIndex],
+      body: Navigator(
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            builder: (context) {
+              // Determinar cuál es el índice actual basado en la ruta
+              final routeIndex = _pageRoutes.indexOf(settings.name ?? '/inicio');
+              if (routeIndex != -1) {
+                _currentIndex = routeIndex;
+              }
+              // Retornar página vacía, la verdadera navegación ocurre en el nivel superior
+              return const SizedBox.shrink();
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _onFabPressed,
         backgroundColor: scheme.primary,
@@ -211,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox(
                   width: 60,
                   child: InkWell(
-                    onTap: () => setState(() => _currentIndex = itemIdx),
+                    onTap: () => _onNavItemTapped(itemIdx),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
