@@ -42,9 +42,10 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadMyEvents();
-    }
+    // Removido: no actualizar automáticamente cuando se entra a la app
+    // if (state == AppLifecycleState.resumed) {
+    //   _loadMyEvents();
+    // }
   }
 
   Future<void> _loadMyEvents() async {
@@ -291,6 +292,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(width: 16),
                                   PopupMenuButton<String>(
                                     initialValue: sort,
                                     onSelected: (v) => _sortNotifier.value = v,
