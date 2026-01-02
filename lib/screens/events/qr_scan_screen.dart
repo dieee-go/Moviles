@@ -115,6 +115,25 @@ class _QrScanScreenState extends State<QrScanScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // Evitar usar la cámara en Flutter Web: MobileScanner no está soportado y provoca asserts.
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Escanear Asistencia'),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Text(
+              'El escaneo de QR no está disponible en la versión web. Usa la app móvil para escanear.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Escanear Asistencia'),

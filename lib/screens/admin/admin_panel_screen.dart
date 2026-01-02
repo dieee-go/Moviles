@@ -223,9 +223,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: scheme.onPrimary,
-          unselectedLabelColor: scheme.onPrimary.withValues(alpha: 179),
-          indicatorColor: scheme.onPrimary,
+          labelColor: AppTheme.getAppBarTabBarTheme(scheme).labelColor,
+          unselectedLabelColor: AppTheme.getAppBarTabBarTheme(scheme).unselectedLabelColor,
+          indicatorColor: AppTheme.getAppBarTabBarTheme(scheme).indicatorColor,
           tabs: const [
             Tab(icon: Icon(Icons.people), text: 'Usuarios'),
             Tab(icon: Icon(Icons.badge), text: 'Organizadores'),

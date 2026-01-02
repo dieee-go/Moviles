@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final String eventId;
@@ -87,34 +88,43 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Código QR del Evento'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+          content: SizedBox(
+            width: 300,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 16),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: 250,
+                      height: 250,
+                      child: QrImageView(
+                        data: qrData,
+                        version: QrVersions.auto,
+                        size: 250,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-                child: QrImageView(
-                  data: qrData,
-                  version: QrVersions.auto,
-                  size: 250,
-                  backgroundColor: Colors.white,
+                const SizedBox(height: 16),
+                Text(
+                  'Los estudiantes pueden escanear este QR para registrar su asistencia',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Los estudiantes pueden escanear este QR para registrar su asistencia',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -199,11 +209,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     final registeredCount = _allAttendees.length;
     final checkedInCount = _checkedInAttendees.length;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asistencia'),
+        centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAttendees,
+            tooltip: 'Actualizar',
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -227,24 +244,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: AppTheme.getAppBarTabBarTheme(scheme).labelColor,
+          unselectedLabelColor: AppTheme.getAppBarTabBarTheme(scheme).unselectedLabelColor,
+          indicatorColor: AppTheme.getAppBarTabBarTheme(scheme).indicatorColor,
           tabs: [
             Tab(
-              text: 'Registrados ($registeredCount)',
               icon: const Icon(Icons.person_add),
+              text: 'Registrados ($registeredCount)',
             ),
             Tab(
-              text: 'Asistieron ($checkedInCount)',
               icon: const Icon(Icons.check_circle),
+              text: 'Asistieron ($checkedInCount)',
             ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildAttendeeList(_allAttendees),
-          _buildAttendeeList(_checkedInAttendees),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _loadAttendees,
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildAttendeeList(_allAttendees),
+            _buildAttendeeList(_checkedInAttendees),
+          ],
+        ),
       ),
     );
   }

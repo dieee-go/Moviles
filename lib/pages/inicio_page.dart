@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
-import '../screens/notifications/notifications_screen.dart';
 import '../theme/app_theme_extensions.dart';
 
 class InicioPage extends StatefulWidget {
@@ -131,43 +130,6 @@ class _InicioPageState extends State<InicioPage> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.alternativeSurface,
-      appBar: AppBar(
-        backgroundColor: scheme.surface,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.school, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'UniEventos',
-              style: TextStyle(
-                color: scheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-              );
-            },
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: _loading

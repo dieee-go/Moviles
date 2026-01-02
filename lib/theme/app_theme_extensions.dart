@@ -72,4 +72,13 @@ class AppTheme {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return isDark ? Colors.grey[900]! : Colors.grey[50]!;
   }
+
+  /// Retorna la configuración de estilo para un TabBar con tema primario
+  static TabBarTheme getAppBarTabBarTheme(ColorScheme scheme) {
+    return TabBarTheme(
+      labelColor: scheme.onPrimary,
+      unselectedLabelColor: scheme.onPrimary.withValues(alpha: 179),
+      indicatorColor: scheme.onPrimary,
+    );
+  }
 }
