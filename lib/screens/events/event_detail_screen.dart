@@ -161,243 +161,263 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final organizer = _formatOrganizer(organizerData);
 
     return Scaffold(
-      appBar: AppBar(title: Text(name)),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Imagen destacada
-            if (imageUrl != null && imageUrl.isNotEmpty)
-              Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: 220,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: double.infinity,
-                    height: 220,
-                    color: scheme.skeletonBackground,
-                    child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
-                  );
-                },
-              )
-            else
-              Container(
-                width: double.infinity,
-                height: 220,
-                color: scheme.skeletonBackground,
-                child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
-              ),
-
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Título
-                  Text(
-                    name,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Contenedor combinado de Fecha y Ubicación
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: scheme.infoCardBackground,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: scheme.infoCardBorder),
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Imagen destacada
+                if (imageUrl != null && imageUrl.isNotEmpty)
+                  AspectRatio(
+                    aspectRatio: 5 / 4,
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: scheme.skeletonBackground,
+                          child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
+                        );
+                      },
                     ),
-                    child: Column(
-                      children: [
-                        // Fecha y hora
-                        Row(
+                  )
+                else
+                  AspectRatio(
+                    aspectRatio: 5 / 4,
+                    child: Container(
+                      color: scheme.skeletonBackground,
+                      child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
+                    ),
+                  ),
+
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Título
+                      Text(
+                        name,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Contenedor combinado de Fecha y Ubicación
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: scheme.infoCardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: scheme.infoCardBorder),
+                        ),
+                        child: Column(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: scheme.iconContainerBackground,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(Icons.calendar_today, color: scheme.primary, size: 24),
+                            // Fecha y hora
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: scheme.iconContainerBackground,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.calendar_today, color: scheme.primary, size: 24),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Fecha y hora',
+                                        style: TextStyle(fontSize: 12, color: scheme.secondaryText),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        dateTime,
+                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Fecha y hora',
-                                    style: TextStyle(fontSize: 12, color: scheme.secondaryText),
+                            const SizedBox(height: 16),
+                            Divider(color: scheme.dividerColor, thickness: 1),
+                            const SizedBox(height: 16),
+                            // Ubicación
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: scheme.iconContainerBackground,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    dateTime,
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                  child: Icon(Icons.location_on, color: scheme.primary, size: 24),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ubicación',
+                                        style: TextStyle(fontSize: 12, color: scheme.secondaryText),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        location ?? 'Sin ubicación',
+                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Divider(color: scheme.dividerColor, thickness: 1),
-                        const SizedBox(height: 16),
-                        // Ubicación
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: scheme.iconContainerBackground,
-                                borderRadius: BorderRadius.circular(8),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Sección "Acerca del evento"
+                      const Text(
+                        'Acerca del evento',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description.isEmpty ? 'No hay descripción disponible' : description,
+                        style: TextStyle(fontSize: 15, color: scheme.secondaryText, height: 1.5),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Sección "Organizador"
+                      if (organizer != null) ...[
+                        const Text(
+                          'Organizador',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: scheme.infoCardBackground,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: scheme.infoCardBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: scheme.iconContainerBackground,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.person, color: scheme.primary, size: 24),
                               ),
-                              child: Icon(Icons.location_on, color: scheme.primary, size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  organizer,
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Botón Registrarse (grande y destacado)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: _isRegistered
+                            ? ElevatedButton.icon(
+                                onPressed: null,
+                                icon: const Icon(Icons.check_circle),
+                                label: const Text(
+                                  'Ya estás registrado',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade400,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              )
+                            : ElevatedButton.icon(
+                                onPressed: _registerToEvent,
+                                icon: const Icon(Icons.check_circle),
+                                label: const Text(
+                                  'Registrarse',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1976D2),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                      ),
+
+                      // Botón ver asistentes (solo para organizadores y admins)
+                      if (_userRole == 'organizer' || _userRole == 'admin') ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/attendees', arguments: widget.eventId);
+                            },
+                            icon: const Icon(Icons.people),
+                            label: const Text(
+                              'Ver asistentes',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Ubicación',
-                                    style: TextStyle(fontSize: 12, color: scheme.secondaryText),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    location ?? 'Sin ubicación',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF1976D2),
+                              side: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-
-                  // Sección "Acerca del evento"
-                  const Text(
-                    'Acerca del evento',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    description.isEmpty ? 'No hay descripción disponible' : description,
-                    style: TextStyle(fontSize: 15, color: scheme.secondaryText, height: 1.5),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Sección "Organizador"
-                  if (organizer != null) ...[
-                    const Text(
-                      'Organizador',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: scheme.infoCardBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: scheme.infoCardBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: scheme.iconContainerBackground,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.person, color: scheme.primary, size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              organizer,
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Botón Registrarse (grande y destacado)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: _isRegistered
-                        ? ElevatedButton.icon(
-                            onPressed: null,
-                            icon: const Icon(Icons.check_circle),
-                            label: const Text(
-                              'Ya estás registrado',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade400,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          )
-                        : ElevatedButton.icon(
-                            onPressed: _registerToEvent,
-                            icon: const Icon(Icons.check_circle),
-                            label: const Text(
-                              'Registrarse',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1976D2),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                  ),
-
-                  // Botón ver asistentes (solo para organizadores y admins)
-                  if (_userRole == 'organizer' || _userRole == 'admin') ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/attendees', arguments: widget.eventId);
-                        },
-                        icon: const Icon(Icons.people),
-                        label: const Text(
-                          'Ver asistentes',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF1976D2),
-                          side: const BorderSide(color: Color(0xFF1976D2), width: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+              ],
+            ),
+          ),
+          // Botón de atrás flotante
+          Positioned(
+            top: 12,
+            left: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back, color: Colors.black87),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
