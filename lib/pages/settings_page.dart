@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
 import '../theme/app_theme_extensions.dart';
-import 'admin_panel_page.dart';
+import 'change_password_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -84,6 +84,26 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _requestOrganizerRole() {
+    // Validar si puede solicitar
+    if (!_canRequestOrganizer()) {
+      // Si fue revocado, mostrar mensaje específico
+      if (_requestStatus == 'revoked') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No puedes hacer más solicitudes porque tu rol de organizador fue revocado'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      // Si está pendiente, mostrar otro mensaje
+      else if (_requestStatus == 'pending') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ya tienes una solicitud pendiente')),
+        );
+      }
+      return;
+    }
+
     final user = supabase.auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -119,11 +139,19 @@ class _SettingsPageState extends State<SettingsPage> {
             return;
           }
 
-          await supabase.from('role_requests').upsert({
+          // Si existe una solicitud anterior (rejected o revoked), elimínala primero
+          if (existing != null && (existing['status'] == 'rejected' || existing['status'] == 'revoked')) {
+            await supabase
+                .from('role_requests')
+                .delete()
+                .eq('user_id', user.id);
+          }
+
+          await supabase.from('role_requests').insert({
             'user_id': user.id,
             'status': 'pending',
             'message': 'Solicitud enviada desde app',
-          }, onConflict: 'user_id');
+          });
 
           await _loadRequestStatus();
 
@@ -208,6 +236,10 @@ class _SettingsPageState extends State<SettingsPage> {
         color = Colors.red;
         label = 'Rechazada';
         break;
+      case 'revoked':
+        color = Colors.grey;
+        label = 'Revocada';
+        break;
       case 'pending':
         color = Colors.orange;
         label = 'Pendiente';
@@ -274,6 +306,11 @@ class _SettingsPageState extends State<SettingsPage> {
           }
         }
         return 'Solicitud rechazada.';
+      case 'revoked':
+        if (updated != null) {
+          return 'Tu rol de organizador fue revocado el ${formatDate(updated)}. No puedes solicitar nuevamente.';
+        }
+        return 'Tu rol de organizador fue revocado. No puedes solicitar nuevamente.';
       default:
         if (updated != null) {
           return 'Último estado: $_requestStatus. Actualizado el ${formatDate(updated)}';
@@ -287,6 +324,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (role == 'organizer' || role == 'admin') return false;
     if (_requestStatus == null) return true;
     if (_requestStatus == 'pending') return false;
+    if (_requestStatus == 'revoked') return false; // No permitir solicitar si fue revocado
     if (_requestStatus == 'rejected' && _requestUpdatedAt != null) {
       final daysSince = DateTime.now().difference(_requestUpdatedAt!.toLocal()).inDays;
       return daysSince >= 30;
@@ -468,22 +506,6 @@ class _SettingsPageState extends State<SettingsPage> {
           _sectionTitle('Cuenta'),
           _sectionCard(
             children: [
-              if (_profileRole == 'admin') ...[
-                _navigationTile(
-                  icon: Icons.admin_panel_settings,
-                  title: 'Panel de administración',
-                  titleColor: Colors.blue.shade700,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminPanelPage(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-              ],
               if (_shouldShowStatusTile()) ...[
                 ListTile(
                   leading: _leadingIcon(Icons.verified_user_outlined),
@@ -501,8 +523,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.lock_reset_outlined,
                 title: 'Cambiar contraseña',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cambiar contraseña próximamente')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChangePasswordPage()),
                   );
                 },
               ),
@@ -512,7 +535,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: Icons.badge_outlined,
                   title: 'Solicitar rol de organizador',
                   titleColor: _canRequestOrganizer() ? Colors.black87 : Colors.grey,
-                  onTap: _canRequestOrganizer() ? _requestOrganizerRole : null,
+                  onTap: _requestOrganizerRole,
                 ),
                 const Divider(height: 1),
               ],

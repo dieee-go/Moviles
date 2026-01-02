@@ -42,12 +42,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        color: Colors.white,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
           Flexible(
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -105,6 +107,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

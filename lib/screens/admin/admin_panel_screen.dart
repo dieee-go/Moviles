@@ -185,8 +185,38 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
 
   Future<void> _changeRole(String userId, String newRole) async {
     try {
-      await supabase.from('profiles').update({'role': newRole}).eq('id', userId);
-      if (mounted) context.showSnackBar('Rol actualizado a $newRole');
+      // Obtener rol anterior
+      final currentProfile = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single();
+      final oldRole = currentProfile['role'] as String?;
+      
+      // Actualizar rol
+      await supabase
+          .from('profiles')
+          .update({'role': newRole})
+          .eq('id', userId)
+          .select();
+      
+      // Si se revoca organizador, actualizar status en role_requests
+      if (oldRole == 'organizer' && newRole == 'student') {
+        await supabase
+            .from('role_requests')
+            .update({'status': 'revoked'})
+            .eq('user_id', userId);
+      }
+      
+      if (mounted) {
+        final roleLabel = newRole == 'admin' 
+            ? 'Administrador' 
+            : newRole == 'organizer' 
+              ? 'Organizador' 
+              : 'Estudiante';
+        context.showSnackBar('Rol actualizado a $roleLabel');
+      }
+      
       await Future.wait([
         _loadUsers(reset: true),
         _loadOrganizers(reset: true),
@@ -194,7 +224,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     } on PostgrestException catch (e) {
       if (mounted) context.showSnackBar('Error: ${e.message}', isError: true);
     } catch (e) {
-      if (mounted) context.showSnackBar('Error inesperado', isError: true);
+      if (mounted) context.showSnackBar('Error inesperado: $e', isError: true);
     }
   }
 
@@ -216,16 +246,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        iconTheme: IconThemeData(color: scheme.onPrimary),
-        title: const Text('Panel de Administración'),
-        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: scheme.onSurface,
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        elevation: 0,
+        toolbarHeight: 0,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppTheme.getAppBarTabBarTheme(scheme).labelColor,
-          unselectedLabelColor: AppTheme.getAppBarTabBarTheme(scheme).unselectedLabelColor,
-          indicatorColor: AppTheme.getAppBarTabBarTheme(scheme).indicatorColor,
+          labelColor: scheme.primary,
+          unselectedLabelColor: scheme.primary.withValues(alpha: 0.5),
+          indicatorColor: scheme.primary,
           tabs: const [
             Tab(icon: Icon(Icons.people), text: 'Usuarios'),
             Tab(icon: Icon(Icons.badge), text: 'Organizadores'),
@@ -233,12 +263,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             Tab(icon: Icon(Icons.analytics), text: 'Reportes'),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInitial,
-          ),
-        ],
       ),
       body: TabBarView(
         controller: _tabController,
@@ -559,7 +583,7 @@ class _RequestsSheetState extends State<_RequestsSheet> {
       final data = await supabase
           .from('role_requests')
           .select(
-              'id, user_id, status, message, reason, created_at, updated_at, profiles!inner(nombre, primer_apellido, email)')
+              'id, user_id, status, message, created_at, updated_at, profiles!inner(nombre, primer_apellido, email)')
           .order('created_at', ascending: false);
       setState(() {
         _requests = List<Map<String, dynamic>>.from(data);
@@ -649,26 +673,28 @@ class _RequestsSheetState extends State<_RequestsSheet> {
                                       const SizedBox(height: 8),
                                       Text(msg),
                                     ],
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton.icon(
-                                            onPressed: () => _handle(r['id'] as String, false),
-                                            icon: const Icon(Icons.close, color: Colors.red),
-                                            label: const Text('Rechazar'),
+                                    if (r['status'] == 'pending') ...[
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              onPressed: () => _handle(r['id'] as String, false),
+                                              icon: const Icon(Icons.close, color: Colors.red),
+                                              label: const Text('Rechazar'),
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            onPressed: () => _handle(r['id'] as String, true),
-                                            icon: const Icon(Icons.check),
-                                            label: const Text('Aprobar'),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              onPressed: () => _handle(r['id'] as String, true),
+                                              icon: const Icon(Icons.check),
+                                              label: const Text('Aprobar'),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),

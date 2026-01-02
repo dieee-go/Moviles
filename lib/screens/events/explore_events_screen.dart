@@ -13,16 +13,23 @@ class ExploreEventsScreen extends StatefulWidget {
 }
 
 class ExploreEventsScreenState extends State<ExploreEventsScreen> {
-  List<Map<String, dynamic>> _events = [];
+  List<Map<String, dynamic>> _allEvents = [];
   List<Map<String, dynamic>> _categories = [];
-  String? _selectedCategoryId;
-  String _searchQuery = "";
+  final ValueNotifier<String?> _selectedCategoryIdNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<String> _searchNotifier = ValueNotifier<String>("");
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _selectedCategoryIdNotifier.dispose();
+    _searchNotifier.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -35,8 +42,14 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
           .order('name');
       _categories = List<Map<String, dynamic>>.from(cats);
 
-      // Cargar eventos
-      await _loadEvents();
+      // Cargar todos los eventos (incluye intereses para filtrar localmente)
+      final data = await supabase.from('events').select(
+        'id, name, image_url, event_datetime, created_at, location_id, locations(name), event_interests(interest_id)',
+      ).order('event_datetime', ascending: false);
+
+      setState(() {
+        _allEvents = List<Map<String, dynamic>>.from(data);
+      });
     } on PostgrestException catch (e) {
       if (mounted) {
         context.showSnackBar('Error BD: ${e.message}', isError: true);
@@ -44,31 +57,6 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
     } catch (e) {
       if (mounted) {
         context.showSnackBar('Error cargando datos', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadEvents() async {
-    setState(() => _loading = true);
-    try {
-          final query = supabase.from('events').select(
-            'id, name, image_url, event_datetime, location_id, locations(name), event_interests!inner(interest_id)');
-
-        // Filtrar por categoría si está seleccionada (inner join para asegurar la relación)
-        final data = _selectedCategoryId == null
-          ? await query.order('event_datetime', ascending: false)
-            : await query
-              .eq('event_interests.interest_id', _selectedCategoryId!)
-              .order('event_datetime', ascending: false);
-
-      setState(() {
-        _events = List<Map<String, dynamic>>.from(data);
-      });
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        context.showSnackBar('Error: ${e.message}', isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -101,21 +89,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    List<Map<String, dynamic>> filteredEvents = _events;
-
-    // Filtrar por búsqueda
-    if (_searchQuery.isNotEmpty) {
-      filteredEvents = filteredEvents.where((event) {
-        final name = (event['name'] as String?) ?? '';
-        return name.toLowerCase().contains(_searchQuery.toLowerCase());
-      }).toList();
-    }
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Explorar Eventos'),
-        automaticallyImplyLeading: false,
-      ),
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: _loading
@@ -126,11 +100,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: TextField(
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
+                      onChanged: (value) => _searchNotifier.value = value,
                       decoration: InputDecoration(
                         hintText: 'Buscar eventos...',
                         prefixIcon: const Icon(Icons.search),
@@ -143,72 +113,109 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
 
                   // Categorías
                   if (_categories.isNotEmpty) ...[
-                    SizedBox(
-                      height: 50,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _categories.length + 1,
-                        itemBuilder: (context, i) {
-                          if (i == 0) {
-                            return _buildCategoryChip('Todos', null);
-                          }
-                          final cat = _categories[i - 1];
-                          final name = cat['name'] as String? ?? 'Sin nombre';
-                          return _buildCategoryChip(name, cat['id'] as String);
-                        },
-                      ),
+                    ValueListenableBuilder<String?>(
+                      valueListenable: _selectedCategoryIdNotifier,
+                      builder: (context, selectedId, _) {
+                        return SizedBox(
+                          height: 50,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _categories.length + 1,
+                            itemBuilder: (context, i) {
+                              if (i == 0) {
+                                return _buildCategoryChip('Todos', null);
+                              }
+                              final cat = _categories[i - 1];
+                              final name = cat['name'] as String? ?? 'Sin nombre';
+                              return _buildCategoryChip(name, cat['id'] as String);
+                            },
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                   ],
 
-                  // Contador de eventos
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${filteredEvents.length} eventos encontrados',
-                          style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Lista de eventos
                   Expanded(
-                    child: filteredEvents.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                    child: ValueListenableBuilder<String?>(
+                      valueListenable: _selectedCategoryIdNotifier,
+                      builder: (context, selectedId, child) {
+                        return ValueListenableBuilder<String>(
+                          valueListenable: _searchNotifier,
+                          builder: (context, search, child) {
+                            List<Map<String, dynamic>> filteredEvents = _allEvents;
+
+                            if (selectedId != null) {
+                              filteredEvents = filteredEvents.where((event) {
+                                final interests = event['event_interests'] as List<dynamic>?;
+                                if (interests == null) return false;
+                                return interests.any((i) => (i['interest_id'] as String?) == selectedId);
+                              }).toList();
+                            }
+
+                            if (search.isNotEmpty) {
+                              filteredEvents = filteredEvents.where((event) {
+                                final name = (event['name'] as String?) ?? '';
+                                return name.toLowerCase().contains(search.toLowerCase());
+                              }).toList();
+                            }
+
+                            return Column(
                               children: [
-                                Icon(Icons.search_off,
-                                    size: 80, color: Theme.of(context).colorScheme.skeletonBackground),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'No se encontraron eventos',
-                                  style: TextStyle(
-                                      fontSize: 18, color: Colors.grey),
+                                // Contador de eventos
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${filteredEvents.length} eventos encontrados',
+                                        style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  'Intenta con otra búsqueda',
-                                  style: TextStyle(color: Colors.grey),
+
+                                const SizedBox(height: 16),
+
+                                // Lista de eventos
+                                Expanded(
+                                  child: filteredEvents.isEmpty
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.search_off,
+                                                  size: 80, color: Theme.of(context).colorScheme.skeletonBackground),
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                'No se encontraron eventos',
+                                                style: TextStyle(fontSize: 18, color: Colors.grey),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              const Text(
+                                                'Intenta con otra búsqueda',
+                                                style: TextStyle(color: Colors.grey),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          itemCount: filteredEvents.length,
+                                          itemBuilder: (context, index) {
+                                            final event = filteredEvents[index];
+                                            return _buildEventCard(context, event);
+                                          },
+                                        ),
                                 ),
                               ],
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: filteredEvents.length,
-                            itemBuilder: (context, index) {
-                              final event = filteredEvents[index];
-                              return _buildEventCard(context, event);
-                            },
-                          ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -249,19 +256,13 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
   }
 
   Widget _buildCategoryChip(String label, String? categoryId) {
-    final selected = _selectedCategoryId == categoryId;
+    final selected = _selectedCategoryIdNotifier.value == categoryId;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(label),
         selected: selected,
-        onSelected: (v) async {
-          setState(() {
-            _selectedCategoryId = v ? categoryId : null;
-            _loading = true;
-          });
-          await _loadEvents();
-        },
+        onSelected: (v) => _selectedCategoryIdNotifier.value = v ? categoryId : null,
         backgroundColor: Theme.of(context).colorScheme.surface,
         selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 51),
         labelStyle: TextStyle(

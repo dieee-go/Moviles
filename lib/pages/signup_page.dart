@@ -20,9 +20,11 @@ class _SignupPageState extends State<SignupPage> {
   bool _isLoading = false;
   bool _redirecting = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
   late final TextEditingController _nombreController;
   late final TextEditingController _primerApellidoController;
   late final TextEditingController _segundoApellidoController;
@@ -40,10 +42,14 @@ class _SignupPageState extends State<SignupPage> {
   void initState() {
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
     _nombreController = TextEditingController();
     _primerApellidoController = TextEditingController();
     _segundoApellidoController = TextEditingController();
     _telefonoController = TextEditingController();
+
+    _passwordController.addListener(() => setState(() {}));
+    _confirmPasswordController.addListener(() => setState(() {}));
 
     _loadInterests();
     _setupAuthListener();
@@ -112,6 +118,7 @@ class _SignupPageState extends State<SignupPage> {
     final primerApellido = _primerApellidoController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
     final telefono = _telefonoController.text.trim();
 
     if (nombre.isEmpty) {
@@ -128,6 +135,10 @@ class _SignupPageState extends State<SignupPage> {
     }
     if (password.length < 6) {
       context.showSnackBar('La contraseña debe tener al menos 6 caracteres');
+      return false;
+    }
+    if (password != confirmPassword) {
+      context.showSnackBar('Las contraseñas no coinciden');
       return false;
     }
     if (telefono.isEmpty) {
@@ -231,12 +242,95 @@ class _SignupPageState extends State<SignupPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _nombreController.dispose();
     _primerApellidoController.dispose();
     _segundoApellidoController.dispose();
     _telefonoController.dispose();
     _authStateSubscription.cancel();
     super.dispose();
+  }
+
+  Widget _buildPasswordMatchIcon() {
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+    
+    if (confirmPassword.isEmpty) {
+      return IconButton(
+        icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+      );
+    }
+    
+    final match = password == confirmPassword;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          match ? Icons.check_circle : Icons.cancel,
+          color: match ? Colors.green : Colors.red,
+        ),
+        IconButton(
+          icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordRequirements() {
+    final password = _passwordController.text;
+    final hasMinLength = password.length >= 8;
+    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    final hasLowercase = password.contains(RegExp(r'[a-z]'));
+    final hasNumber = password.contains(RegExp(r'[0-9]'));
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Requisitos de contraseña:',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(height: 8),
+          _buildRequirementRow('Al menos 8 caracteres', hasMinLength),
+          const SizedBox(height: 6),
+          _buildRequirementRow('Al menos una mayúscula (A-Z)', hasUppercase),
+          const SizedBox(height: 6),
+          _buildRequirementRow('Al menos una minúscula (a-z)', hasLowercase),
+          const SizedBox(height: 6),
+          _buildRequirementRow('Al menos un número (0-9)', hasNumber),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementRow(String text, bool isMet) {
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: isMet ? Colors.green : Colors.grey,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            color: isMet ? Colors.green : Colors.grey,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -285,6 +379,15 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
             obscureText: _obscurePassword,
+          ),
+          _buildPasswordRequirements(),
+          TextFormField(
+            controller: _confirmPasswordController,
+            decoration: InputDecoration(
+              labelText: 'Confirmar Contraseña *',
+              suffixIcon: _buildPasswordMatchIcon(),
+            ),
+            obscureText: _obscureConfirmPassword,
           ),
           const SizedBox(height: 24),
           Text(

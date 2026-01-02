@@ -8,6 +8,7 @@ import '../admin/admin_panel_screen.dart';
 import '../events/calendar_screen.dart';
 import '../events/explore_events_screen.dart';
 import '../events/my_events_screen.dart';
+import '../events/my_registrations_screen.dart';
 import 'inicio_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -87,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _pages = [
         InicioScreen(),
         ExploreEventsScreen(),
-        MyEventsScreen(),
+        MyEventsScreen(key: MyEventsScreen.globalKey),
         const CalendarScreen(),
       ];
       _navItems = const [
@@ -101,11 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _pages = [
         InicioScreen(),
         ExploreEventsScreen(),
+        MyRegistrationsScreen(),
         const CalendarScreen(),
       ];
       _navItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
         BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explorar'),
+        BottomNavigationBarItem(icon: Icon(Icons.event_available), label: 'Registros'),
         BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendario'),
       ];
     }
@@ -113,7 +116,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onFabPressed() {
     if (_userRole == 'organizer' || _userRole == 'admin') {
-      Navigator.pushNamed(context, '/create-event');
+      Navigator.pushNamed(context, '/create-event').then((_) {
+        // Recargar lista de eventos cuando regresa
+        MyEventsScreen.globalKey.currentState?.reloadEvents();
+      });
     } else {
       // Escanear QR para estudiantes
       Navigator.pushNamed(context, '/qr-scan');
@@ -200,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: CustomAppBar(
         userPhotoUrl: _userPhotoUrl,
         userName: _userName,
-        onAvatarTap: () => Navigator.pushNamed(context, '/edit-profile'),
+        onAvatarTap: () => Navigator.pushNamed(context, '/profile'),
         onNotificationsTap: () => Navigator.pushNamed(context, '/notifications'),
       ),
       body: _pages.isEmpty

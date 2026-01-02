@@ -3,78 +3,107 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
 
-class NewPasswordPage extends StatefulWidget {
-  const NewPasswordPage({super.key});
+class ChangePasswordPage extends StatefulWidget {
+  const ChangePasswordPage({super.key});
 
   @override
-  State<NewPasswordPage> createState() => _NewPasswordPageState();
+  State<ChangePasswordPage> createState() => _ChangePasswordPageState();
 }
 
-class _NewPasswordPageState extends State<NewPasswordPage> {
-  final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
+class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  
   bool _isLoading = false;
+  bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
   @override
   void initState() {
     super.initState();
-    _passwordController.addListener(() => setState(() {}));
-    _confirmController.addListener(() => setState(() {}));
+    _newPasswordController.addListener(() => setState(() {}));
+    _confirmPasswordController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _passwordController.dispose();
-    _confirmController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   bool _validate() {
-    final password = _passwordController.text;
-    final confirm = _confirmController.text;
-    if (password.length < 6) {
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+    
+    if (newPassword.length < 6) {
       context.showSnackBar('La nueva contraseña debe tener al menos 6 caracteres');
       return false;
     }
-    if (password != confirm) {
+    
+    if (newPassword != confirmPassword) {
       context.showSnackBar('Las contraseñas no coinciden');
       return false;
     }
+    
     return true;
   }
 
-  Future<void> _updatePassword() async {
+  Future<void> _changePassword() async {
     if (!_validate()) return;
+    
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.updateUser(UserAttributes(password: _passwordController.text));
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('Usuario no autenticado');
+      
+      final email = user.email;
+      if (email == null) throw Exception('Email no disponible');
+      
+      // Validar contraseña actual
+      try {
+        await supabase.auth.signInWithPassword(
+          email: email,
+          password: _currentPasswordController.text,
+        );
+      } on AuthException {
+        if (mounted) context.showSnackBar('Contraseña actual incorrecta', isError: true);
+        return;
+      }
+      
+      // Cambiar a la nueva contraseña
+      await supabase.auth.updateUser(
+        UserAttributes(password: _newPasswordController.text),
+      );
+      
       if (mounted) {
-        context.showSnackBar('Contraseña actualizada. Inicia sesión nuevamente.');
+        context.showSnackBar('Contraseña actualizada correctamente');
         Navigator.of(context).pop();
       }
     } on AuthException catch (e) {
-      if (mounted) context.showSnackBar(e.message, isError: true);
+      if (mounted) context.showSnackBar('Error: ${e.message}', isError: true);
     } catch (e) {
-      if (mounted) context.showSnackBar('Error inesperado', isError: true);
+      if (mounted) context.showSnackBar('Error inesperado: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Widget _buildPasswordMatchIcon() {
-    final password = _passwordController.text;
-    final confirm = _confirmController.text;
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
     
-    if (confirm.isEmpty) {
+    if (confirmPassword.isEmpty) {
       return IconButton(
         icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
         onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
       );
     }
     
-    final match = password == confirm;
+    final match = newPassword == confirmPassword;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -91,7 +120,7 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   }
 
   Widget _buildPasswordRequirements() {
-    final password = _passwordController.text;
+    final password = _newPasswordController.text;
     final hasMinLength = password.length >= 8;
     final hasUppercase = password.contains(RegExp(r'[A-Z]'));
     final hasLowercase = password.contains(RegExp(r'[a-z]'));
@@ -148,14 +177,33 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva contraseña')),
+      appBar: AppBar(
+        title: const Text('Cambiar contraseña'),
+        centerTitle: true,
+      ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
         children: [
-          const Text('Ingresa tu nueva contraseña para completar la recuperación.'),
-          const SizedBox(height: 18),
+          const Text(
+            'Para cambiar tu contraseña, primero debes ingresar tu contraseña actual.',
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
           TextFormField(
-            controller: _passwordController,
+            controller: _currentPasswordController,
+            decoration: InputDecoration(
+              labelText: 'Contraseña actual',
+              suffixIcon: IconButton(
+                icon: Icon(_obscureCurrent ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+              ),
+            ),
+            obscureText: _obscureCurrent,
+            enabled: !_isLoading,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _newPasswordController,
             decoration: InputDecoration(
               labelText: 'Nueva contraseña',
               suffixIcon: IconButton(
@@ -164,19 +212,21 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
               ),
             ),
             obscureText: _obscureNew,
+            enabled: !_isLoading,
           ),
           _buildPasswordRequirements(),
           TextFormField(
-            controller: _confirmController,
+            controller: _confirmPasswordController,
             decoration: InputDecoration(
-              labelText: 'Confirmar contraseña',
+              labelText: 'Confirmar nueva contraseña',
               suffixIcon: _buildPasswordMatchIcon(),
             ),
             obscureText: _obscureConfirm,
+            enabled: !_isLoading,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _isLoading ? null : _updatePassword,
+            onPressed: _isLoading ? null : _changePassword,
             child: Text(_isLoading ? 'Actualizando...' : 'Actualizar contraseña'),
           ),
         ],

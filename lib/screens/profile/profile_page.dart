@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -25,11 +26,13 @@ class _ProfilePageState extends State<ProfilePage> {
   String _carrera = '';
   String _role = '';
   bool _loading = true;
+  List<Map<String, dynamic>> _roleHistory = [];
 
   @override
   void initState() {
     super.initState();
     _getProfile();
+    _loadRoleHistory();
   }
 
   Future<void> _getProfile() async {
@@ -56,6 +59,28 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) context.showSnackBar('Error cargando perfil', isError: true);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadRoleHistory() async {
+    try {
+      final userId = supabase.auth.currentSession?.user.id;
+      if (userId == null) return;
+      
+      final data = await supabase
+          .from('role_history')
+          .select('role, action, changed_at, notes')
+          .eq('user_id', userId)
+          .order('changed_at', ascending: false)
+          .limit(10);
+      
+      if (mounted) {
+        setState(() {
+          _roleHistory = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error loading role history: $e');
     }
   }
 
@@ -107,6 +132,129 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Color _getRoleColor(String? role) {
+    switch (role?.toLowerCase().trim()) {
+      case 'admin':
+        return Colors.red;
+      case 'organizer':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    
+    if (diff.inDays > 30) {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (diff.inDays > 0) {
+      return 'Hace ${diff.inDays} día${diff.inDays > 1 ? 's' : ''}';
+    } else if (diff.inHours > 0) {
+      return 'Hace ${diff.inHours} hora${diff.inHours > 1 ? 's' : ''}';
+    } else {
+      return 'Hace unos minutos';
+    }
+  }
+
+  Widget _buildRoleBadge() {
+    final wasOrganizer = _roleHistory.any((h) => 
+      h['role'] == 'organizer' && h['action'] == 'revoked'
+    );
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _getRoleColor(_role).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            _roleLabel,
+            style: TextStyle(
+              color: _getRoleColor(_role),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        if (wasOrganizer && _role.toLowerCase() != 'organizer') ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Fue organizador anteriormente',
+            child: Icon(
+              Icons.history,
+              size: 20,
+              color: Colors.orange,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRoleHistorySection() {
+    if (_roleHistory.isEmpty) return const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Text(
+            'Historial de Roles',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          itemCount: _roleHistory.length,
+          itemBuilder: (context, index) {
+            final entry = _roleHistory[index];
+            final role = entry['role'] as String;
+            final action = entry['action'] as String;
+            final date = DateTime.parse(entry['changed_at'] as String);
+            
+            String roleLabel;
+            switch (role.toLowerCase()) {
+              case 'admin':
+                roleLabel = 'Administrador';
+                break;
+              case 'organizer':
+                roleLabel = 'Organizador';
+                break;
+              default:
+                roleLabel = role;
+            }
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Icon(
+                  action == 'granted' ? Icons.check_circle : Icons.cancel,
+                  color: action == 'granted' ? Colors.green : Colors.orange,
+                ),
+                title: Text(
+                  action == 'granted' 
+                      ? 'Rol de $roleLabel otorgado' 
+                      : 'Rol de $roleLabel revocado',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(_formatDate(date)),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   Widget _buildSkeleton() {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -136,14 +284,16 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: isDark ? Theme.of(context).colorScheme.surface : Colors.grey[100],
       appBar: AppBar(
         title: const Text('Mi Perfil'),
         centerTitle: true,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -158,71 +308,72 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       body: _loading
           ? _buildSkeleton()
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  Avatar(
-                    imageUrl: _avatarUrl,
-                    onUpload: _onUpload,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _nombreCompleto,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+          : RefreshIndicator(
+              onRefresh: () async {
+                await _getProfile();
+                await _loadRoleHistory();
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 40),
+                    Avatar(
+                      imageUrl: _avatarUrl,
+                      onUpload: _onUpload,
                     ),
-                  ),
-                  if (_roleLabel.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 20),
                     Text(
-                      _roleLabel,
+                      _nombreCompleto,
                       style: TextStyle(
-                        fontSize: 15,
-                        color: scheme.secondaryText,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
+                    if (_roleLabel.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildRoleBadge(),
+                    ],
+                    const SizedBox(height: 30),
+                    _buildRoleHistorySection(),
+                    _ProfileField(label: 'Correo Institucional', value: _email),
+                    const SizedBox(height: 20),
+                    _ProfileField(
+                      label: 'Carrera',
+                      value: _carrera.isEmpty ? 'No especificada' : _carrera,
+                    ),
+                    const SizedBox(height: 40),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar Perfil'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.logout, color: Colors.red),
+                              label: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
+                          onPressed: _signOut,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
                   ],
-                  const SizedBox(height: 30),
-                  _ProfileField(label: 'Correo Institucional', value: _email),
-                  const SizedBox(height: 20),
-                  _ProfileField(
-                    label: 'Carrera',
-                    value: _carrera.isEmpty ? 'No especificada' : _carrera,
-                  ),
-                  const SizedBox(height: 40),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Editar Perfil'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.logout, color: Colors.red),
-                            label: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
-                        onPressed: _signOut,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
+                ),
               ),
             ),
     );

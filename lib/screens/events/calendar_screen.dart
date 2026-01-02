@@ -102,7 +102,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Scaffold _buildLoadingSkeleton() {
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendario de Eventos')),
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Padding(
@@ -158,11 +157,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.alternativeSurface,
-      appBar: AppBar(
-        title: const Text('Calendario de Eventos'),
-        centerTitle: true,
-        elevation: 0,
-      ),
       body: Column(
         children: [
           // Header del mes
