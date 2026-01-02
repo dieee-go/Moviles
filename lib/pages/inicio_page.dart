@@ -14,17 +14,22 @@ class InicioPage extends StatefulWidget {
 
 class _InicioPageState extends State<InicioPage> {
   final TextEditingController _searchCtrl = TextEditingController();
-  List<Map<String, dynamic>> _featuredEvents = [];
-  List<Map<String, dynamic>> _popularEvents = [];
-  List<Map<String, dynamic>> _recommendedEvents = [];
+  List<Map<String, dynamic>> _allEvents = [];
   List<Map<String, dynamic>> _categories = [];
-  String? _selectedCategoryId;
+  final ValueNotifier<String?> _selectedCategoryIdNotifier = ValueNotifier<String?>(null);
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _selectedCategoryIdNotifier.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -36,26 +41,14 @@ class _InicioPageState extends State<InicioPage> {
           .order('name');
       _categories = List<Map<String, dynamic>>.from(cats);
 
-      final featured = await supabase
+      final events = await supabase
           .from('events')
-          .select('id, name, image_url, event_datetime, location_id, locations(name)')
-          .order('event_datetime', ascending: false)
-          .limit(3);
-      _featuredEvents = List<Map<String, dynamic>>.from(featured);
+          .select(
+            'id, name, image_url, created_at, event_datetime, location_id, locations(name), event_interests(interest_id)',
+          )
+          .order('event_datetime', ascending: false);
 
-      final popular = await supabase
-          .from('events')
-          .select('id, name, image_url, event_datetime, location_id, locations(name)')
-          .order('created_at', ascending: false)
-          .limit(5);
-      _popularEvents = List<Map<String, dynamic>>.from(popular);
-
-      final recommended = await supabase
-          .from('events')
-          .select('id, name, image_url, event_datetime, location_id, locations(name)')
-          .order('event_datetime', ascending: false)
-          .limit(5);
-      _recommendedEvents = List<Map<String, dynamic>>.from(recommended);
+      _allEvents = List<Map<String, dynamic>>.from(events);
     } on PostgrestException catch (e) {
       if (mounted) {
         context.showSnackBar('Error BD: ${e.message}', isError: true);
@@ -69,43 +62,47 @@ class _InicioPageState extends State<InicioPage> {
     }
   }
 
-  Future<void> _filterByCategory(String? categoryId) async {
-    setState(() {
-      _selectedCategoryId = categoryId;
-      _loading = true;
-    });
-
-    try {
-      if (categoryId == null) {
-        await _loadData();
-      } else {
-        final filtered = await supabase
-            .from('events')
-            .select('id, name, image_url, event_datetime, location_id, locations(name), event_interests!inner(interest_id)')
-            .eq('event_interests.interest_id', categoryId)
-            .order('event_datetime', ascending: false);
-
-        setState(() {
-          _featuredEvents = List<Map<String, dynamic>>.from(filtered.take(3));
-          _popularEvents = List<Map<String, dynamic>>.from(filtered.take(5));
-          _recommendedEvents = List<Map<String, dynamic>>.from(filtered);
-        });
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        context.showSnackBar('Error filtro: ${e.message}', isError: true);
-      }
-    } catch (e) {
-      if (mounted) {
-        context.showSnackBar('Error filtrando: $e', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   String _categoryLabel(Map<String, dynamic> cat) {
     return (cat['name'] as String?) ?? 'Sin nombre';
+  }
+
+  List<Map<String, dynamic>> _filterByCategoryLocal(List<Map<String, dynamic>> source, String? categoryId) {
+    if (categoryId == null) return List<Map<String, dynamic>>.from(source);
+    return source.where((event) {
+      final interests = event['event_interests'] as List<dynamic>?;
+      if (interests == null) return false;
+      return interests.any((i) => (i['interest_id'] as String?) == categoryId);
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _sortedFeatured(List<Map<String, dynamic>> source, String? categoryId) {
+    final filtered = _filterByCategoryLocal(source, categoryId);
+    filtered.sort((a, b) {
+      final da = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+    return filtered.take(3).toList();
+  }
+
+  List<Map<String, dynamic>> _sortedPopular(List<Map<String, dynamic>> source, String? categoryId) {
+    final filtered = _filterByCategoryLocal(source, categoryId);
+    filtered.sort((a, b) {
+      final da = DateTime.tryParse((a['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse((b['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+    return filtered.take(5).toList();
+  }
+
+  List<Map<String, dynamic>> _sortedRecommended(List<Map<String, dynamic>> source, String? categoryId) {
+    final filtered = _filterByCategoryLocal(source, categoryId);
+    filtered.sort((a, b) {
+      final da = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+    return filtered.take(5).toList();
   }
 
   String _formatDateTime(String? isoDate) {
@@ -117,12 +114,6 @@ class _InicioPageState extends State<InicioPage> {
     } catch (_) {
       return '';
     }
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
   }
 
   @override
@@ -159,18 +150,29 @@ class _InicioPageState extends State<InicioPage> {
                       ),
                     ),
 
-                    if (_featuredEvents.isNotEmpty) ...[
-                      SizedBox(
-                        height: 270,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _featuredEvents.length,
-                          itemBuilder: (context, i) => _buildFeaturedCard(_featuredEvents[i]),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                    ValueListenableBuilder<String?>(
+                      valueListenable: _selectedCategoryIdNotifier,
+                      builder: (context, categoryId, _) {
+                        final featured = _sortedFeatured(_allEvents, categoryId);
+                        if (featured.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return Column(
+                          children: [
+                            SizedBox(
+                              height: 270,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: featured.length,
+                                itemBuilder: (context, i) => _buildFeaturedCard(featured[i]),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        );
+                      },
+                    ),
 
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -180,68 +182,81 @@ class _InicioPageState extends State<InicioPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      height: 42,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _categories.length + 1,
-                        itemBuilder: (context, i) {
-                          if (i == 0) {
-                            return _buildCategoryChip('Todos', null);
-                          }
-                          final cat = _categories[i - 1];
-                          return _buildCategoryChip(_categoryLabel(cat), cat['id'] as String);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    ValueListenableBuilder<String?>(
+                      valueListenable: _selectedCategoryIdNotifier,
+                      builder: (context, categoryId, _) {
+                        final popular = _sortedPopular(_allEvents, categoryId);
+                        final recommended = _sortedRecommended(_allEvents, categoryId);
 
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Eventos Populares',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_popularEvents.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _popularEvents.length,
-                        itemBuilder: (context, i) => _buildEventListTile(_popularEvents[i]),
-                      ),
-                    const SizedBox(height: 24),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 42,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: _categories.length + 1,
+                                itemBuilder: (context, i) {
+                                  if (i == 0) {
+                                    return _buildCategoryChip('Todos', null);
+                                  }
+                                  final cat = _categories[i - 1];
+                                  return _buildCategoryChip(_categoryLabel(cat), cat['id'] as String);
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
 
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Recomendados para ti',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'Eventos Populares',
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (popular.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
+                              )
+                            else
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: popular.length,
+                                itemBuilder: (context, i) => _buildEventListTile(popular[i]),
+                              ),
+                            const SizedBox(height: 24),
+
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'Recomendados para ti',
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (recommended.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
+                              )
+                            else
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: recommended.length,
+                                itemBuilder: (context, i) => _buildEventListTile(recommended[i]),
+                              ),
+                            const SizedBox(height: 24),
+                          ],
+                        );
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    if (_recommendedEvents.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _recommendedEvents.length,
-                        itemBuilder: (context, i) => _buildEventListTile(_recommendedEvents[i]),
-                      ),
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -486,13 +501,13 @@ class _InicioPageState extends State<InicioPage> {
 
   Widget _buildCategoryChip(String label, String? categoryId) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = _selectedCategoryId == categoryId;
+    final selected = _selectedCategoryIdNotifier.value == categoryId;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(label),
         selected: selected,
-        onSelected: (v) => _filterByCategory(v ? categoryId : null),
+        onSelected: (v) => _selectedCategoryIdNotifier.value = v ? categoryId : null,
         backgroundColor: scheme.surface,
         selectedColor: scheme.primary.withValues(alpha: 0.2),
         labelStyle: TextStyle(

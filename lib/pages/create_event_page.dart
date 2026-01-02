@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
@@ -225,6 +226,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
               TextFormField(
                 controller: _capacityCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(labelText: 'Capacidad'),
               ),
               const SizedBox(height: 12),

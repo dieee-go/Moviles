@@ -8,18 +8,43 @@ import '../../utils/translations.dart';
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
 
+  // ignore: library_private_types_in_public_api
+  static final GlobalKey<_MyEventsScreenState> globalKey = GlobalKey();
+
   @override
   State<MyEventsScreen> createState() => _MyEventsScreenState();
 }
 
-class _MyEventsScreenState extends State<MyEventsScreen> {
+class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _myEvents = [];
   bool _loading = true;
+  final ValueNotifier<String> _filterNotifier = ValueNotifier('all'); // all | active | done | cancelled
+  final ValueNotifier<String> _sortNotifier = ValueNotifier('date_asc'); // date_asc | date_desc | name_asc | name_desc
+
+  void reloadEvents() {
+    _loadMyEvents();
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadMyEvents();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _filterNotifier.dispose();
+    _sortNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadMyEvents();
+    }
   }
 
   Future<void> _loadMyEvents() async {
@@ -127,6 +152,40 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     return '$day/$month/$year $hour:$minute';
   }
 
+  List<Map<String, dynamic>> _applySortAndFilter(String sort) {
+    List<Map<String, dynamic>> list = List.from(_myEvents);
+
+    list.sort((a, b) {
+      final dateA = DateTime.tryParse(a['event_datetime'] as String? ?? '')?.toLocal() ?? DateTime(1900);
+      final dateB = DateTime.tryParse(b['event_datetime'] as String? ?? '')?.toLocal() ?? DateTime(1900);
+      final nameA = (a['name'] as String? ?? '').toLowerCase();
+      final nameB = (b['name'] as String? ?? '').toLowerCase();
+
+      switch (sort) {
+        case 'date_desc':
+          return dateB.compareTo(dateA);
+        case 'name_asc':
+          return nameA.compareTo(nameB);
+        case 'name_desc':
+          return nameB.compareTo(nameA);
+        case 'date_asc':
+        default:
+          return dateA.compareTo(dateB);
+      }
+    });
+
+    return list;
+  }
+
+  Widget _buildFilterChip({required String label, required String value, required String current}) {
+    final isSelected = current == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => _filterNotifier.value = value,
+    );
+  }
+
   Future<void> _showDeleteDialog(String id, String name) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -166,19 +225,6 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Eventos'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/create-event');
-              _loadMyEvents();
-            },
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: _loadMyEvents,
         child: _loading
@@ -210,97 +256,147 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                       ),
                     ],
                   )
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _myEvents.length,
-                    itemBuilder: (context, index) {
-                      final event = _myEvents[index];
-                      final eventId = event['id'] as String;
-                      final name = event['name'] as String? ?? 'Sin título';
-                      final dateTime = event['event_datetime'] as String?;
-                      final statusStr = event['status'] as String? ?? 'active';
-                      final locationData = event['locations'];
-                      final location = locationData != null ? locationData['name'] as String? : null;
-                      final statusStyle = _getStatusStyle(statusStr);
-
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: ListTile(
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/event-detail',
-                              arguments: eventId,
-                            );
-                          },
-                          leading: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: statusStyle['color'] as Color?,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              statusStyle['icon'] as IconData?,
-                              color: statusStyle['iconColor'] as Color?,
-                            ),
-                          ),
-                          title: Text(
-                            name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                : ValueListenableBuilder<String>(
+                    valueListenable: _filterNotifier,
+                    builder: (context, filter, child) {
+                      return ValueListenableBuilder<String>(
+                        valueListenable: _sortNotifier,
+                        builder: (context, sort, child) {
+                          final list = _applySortAndFilter(sort).where((event) {
+                            final status = event['status'] as String? ?? 'active';
+                            if (filter == 'all') return true;
+                            return status == filter;
+                          }).toList();
+                          
+                          return ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
                             children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                _formatDateTime(dateTime),
-                                style: const TextStyle(fontSize: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: [
+                                          _buildFilterChip(label: 'Todos', value: 'all', current: filter),
+                                          const SizedBox(width: 8),
+                                          _buildFilterChip(label: 'Activos', value: 'active', current: filter),
+                                          const SizedBox(width: 8),
+                                          _buildFilterChip(label: 'Finalizados', value: 'done', current: filter),
+                                          const SizedBox(width: 8),
+                                          _buildFilterChip(label: 'Cancelados', value: 'cancelled', current: filter),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    initialValue: sort,
+                                    onSelected: (v) => _sortNotifier.value = v,
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(value: 'date_asc', child: Text('Fecha (más próximas)')),
+                                      PopupMenuItem(value: 'date_desc', child: Text('Fecha (más lejanas)')),
+                                      PopupMenuItem(value: 'name_asc', child: Text('Nombre (A-Z)')),
+                                      PopupMenuItem(value: 'name_desc', child: Text('Nombre (Z-A)')),
+                                    ],
+                                    child: const Icon(Icons.sort, size: 20),
+                                  ),
+                                ],
                               ),
-                              if (location != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  location,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
+                              const SizedBox(height: 12),
+                              ...list.map((event) {
+                            final eventId = event['id'] as String;
+                            final name = event['name'] as String? ?? 'Sin título';
+                            final dateTime = event['event_datetime'] as String?;
+                            final statusStr = event['status'] as String? ?? 'active';
+                            final locationData = event['locations'];
+                            final location = locationData != null ? locationData['name'] as String? : null;
+                            final statusStyle = _getStatusStyle(statusStr);
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                              child: ListTile(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/event-detail',
+                                    arguments: eventId,
+                                  );
+                                },
+                                leading: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: statusStyle['color'] as Color?,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    statusStyle['icon'] as IconData?,
+                                    color: statusStyle['iconColor'] as Color?,
+                                  ),
                                 ),
-                              ],
-                              const SizedBox(height: 2),
-                              Text(
-                                translateEventStatus(statusStr),
-                                style: TextStyle(
-                                  color: statusStyle['iconColor'] as Color?,
-                                  fontWeight: FontWeight.bold,
+                                title: Text(
+                                  name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _formatDateTime(dateTime),
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    if (location != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        location,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      translateEventStatus(statusStr),
+                                      style: TextStyle(
+                                        color: statusStyle['iconColor'] as Color?,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/edit-event',
+                                        arguments: eventId,
+                                      );
+                                    } else if (value == 'delete') {
+                                      _showDeleteDialog(eventId, name);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Eliminar'),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/edit-event',
-                                  arguments: eventId,
-                                );
-                              } else if (value == 'delete') {
-                                _showDeleteDialog(eventId, name);
-                              }
-                            },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Editar'),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Eliminar'),
-                              ),
-                            ],
-                          ),
-                        ),
+                            );
+                          }),
+                        ],
                       );
+                    },
+                  );
                     },
                   ),
       ),
