@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../../components/skeletons.dart';
 import '../../components/custom_app_bar.dart';
 import '../../main.dart';
@@ -31,6 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
     _loadUserRole();
   }
 
@@ -206,7 +212,10 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: CustomAppBar(
         userPhotoUrl: _userPhotoUrl,
         userName: _userName,
-        onAvatarTap: () => Navigator.pushNamed(context, '/profile'),
+        onAvatarTap: () async {
+          await Navigator.pushNamed(context, '/profile');
+          _loadUserRole(); // recarga avatar/nombre tras volver del perfil
+        },
         onNotificationsTap: () => Navigator.pushNamed(context, '/notifications'),
       ),
       body: _pages.isEmpty

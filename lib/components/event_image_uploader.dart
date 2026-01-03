@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unieventos/main.dart';
+
 import '../theme/app_theme_extensions.dart';
+import '../utils/image_crop_helper.dart';
 
 class EventImageUploader extends StatefulWidget {
   const EventImageUploader({
@@ -98,33 +99,41 @@ class _EventImageUploaderState extends State<EventImageUploader> {
   }
 
   Future<void> _upload() async {
-    final picker = ImagePicker();
-    final imageFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (imageFile == null) return;
-
+    final selection = await ImageCropHelper.pickOriginalAndCropped(ratio: 5.0 / 4.0);
+    if (selection == null) return;
     setState(() => _isLoading = true);
 
     try {
-      final bytes = await imageFile.readAsBytes();
-      final fileExt = imageFile.path.split('.').last.toLowerCase();
-      final fileName = '${DateTime.now().toIso8601String()}.$fileExt';
+      final (picked, cropped) = selection;
+      final originalBytes = await ImageCropHelper.compressToMaxBytes(await picked.readAsBytes());
+      final croppedBytes = await ImageCropHelper.compressToMaxBytes(await cropped.readAsBytes());
+
       final user = supabase.auth.currentUser;
-      final path = user != null ? '${user.id}/$fileName' : fileName;
+      final userPrefix = user != null ? '${user.id}/' : '';
+      final timestamp = DateTime.now().toIso8601String();
+      final contentType = picked.mimeType ?? 'image/jpeg';
 
+      // 1) Subir original
+      final originalPath = '${userPrefix}originals/event_$timestamp.jpg';
       await supabase.storage.from('event-images').uploadBinary(
-        path,
-        bytes,
-        fileOptions: FileOptions(contentType: imageFile.mimeType, upsert: true),
-      );
+            originalPath,
+            originalBytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
 
-      final imageUrlResponse = await supabase.storage
+      // 2) Subir recortada (thumb)
+      final thumbPath = '${userPrefix}thumbs/event_$timestamp.jpg';
+      await supabase.storage.from('event-images').uploadBinary(
+            thumbPath,
+            croppedBytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+          );
+
+      final thumbUrl = await supabase.storage
           .from('event-images')
-          .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+          .createSignedUrl(thumbPath, 60 * 60 * 24 * 365 * 10);
 
-      widget.onUpload(imageUrlResponse);
+      widget.onUpload(thumbUrl);
     } on StorageException catch (error) {
       if (mounted) {
         context.showSnackBar(error.message, isError: true);

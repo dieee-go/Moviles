@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
@@ -23,6 +24,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
     _loadEventDetail();
   }
 
@@ -172,15 +178,36 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 if (imageUrl != null && imageUrl.isNotEmpty)
                   AspectRatio(
                     aspectRatio: 5 / 4,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: scheme.skeletonBackground,
-                          child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
-                        );
-                      },
+                    child: GestureDetector(
+                      onTap: () => _openImageViewer(imageUrl),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: scheme.skeletonBackground,
+                                child: Icon(Icons.event, size: 60, color: scheme.secondaryText),
+                              );
+                            },
+                          ),
+                          // Gradiente oscuro en la parte superior para visibilidad de iconos
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.center,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.4),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 else
@@ -403,17 +430,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           ),
           // Botón de atrás flotante
           Positioned(
-            top: 12,
-            left: 12,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  shape: BoxShape.circle,
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_back, color: Colors.black87),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.black87),
               ),
             ),
           ),
@@ -422,31 +452,135 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
+  void _openImageViewer(String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.9),
+      builder: (_) => GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Container(
+          color: Colors.transparent,
+          alignment: Alignment.center,
+          child: InteractiveViewer(
+            minScale: 0.8,
+            maxScale: 4,
+            child: Hero(
+              tag: 'event-image-viewer',
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Scaffold _buildDetailSkeleton() {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cargando...')),
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Skeletons.box(height: 220),
+            AspectRatio(
+              aspectRatio: 5 / 4,
+              child: Skeletons.box(),
+            ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Skeletons.box(width: 220, height: 22, radius: 8),
-                  const SizedBox(height: 16),
-                  Skeletons.box(width: 180, height: 16, radius: 8),
-                  const SizedBox(height: 10),
-                  Skeletons.box(width: 140, height: 14, radius: 8),
-                  const SizedBox(height: 18),
-                  Skeletons.box(height: 64, radius: 12),
-                  const SizedBox(height: 16),
-                  Skeletons.form(fields: 5, fieldHeight: 16, spacing: 10),
+                  // Título
+                  Skeletons.box(width: 240, height: 26, radius: 10),
                   const SizedBox(height: 20),
-                  Skeletons.box(height: 48, radius: 12),
+
+                  // Card fecha / ubicación
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.skeletonBackground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Skeletons.box(width: 44, height: 44, radius: 10),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Skeletons.box(width: 90, height: 12, radius: 6),
+                                  const SizedBox(height: 6),
+                                  Skeletons.box(width: 180, height: 16, radius: 8),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Skeletons.box(height: 1, radius: 1),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Skeletons.box(width: 44, height: 44, radius: 10),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Skeletons.box(width: 80, height: 12, radius: 6),
+                                  const SizedBox(height: 6),
+                                  Skeletons.box(width: 200, height: 16, radius: 8),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Acerca del evento
+                  Skeletons.box(width: 160, height: 18, radius: 8),
+                  const SizedBox(height: 12),
+                  Skeletons.box(height: 14, radius: 6),
+                  const SizedBox(height: 8),
+                  Skeletons.box(width: double.infinity, height: 14, radius: 6),
+                  const SizedBox(height: 8),
+                  Skeletons.box(width: 220, height: 14, radius: 6),
+                  const SizedBox(height: 24),
+
+                  // Organizador
+                  Skeletons.box(width: 140, height: 18, radius: 8),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.skeletonBackground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Skeletons.box(width: 44, height: 44, radius: 10),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Skeletons.box(width: double.infinity, height: 16, radius: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Botones
+                  Skeletons.box(height: 52, radius: 12),
+                  const SizedBox(height: 12),
+                  Skeletons.box(height: 52, radius: 12),
                 ],
               ),
             ),

@@ -42,11 +42,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return SafeArea(
       bottom: false,
       child: Container(
-        color: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: scheme.surface,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -64,20 +65,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                     'assets/images/unieventos_icon.svg',
                     width: 40,
                     height: 40,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.darken,
-                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Flexible(
+                Flexible(
                   child: Text(
                     'UniEventos',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E1E1E),
+                      color: scheme.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -91,7 +88,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               IconButton(
                 icon: const Icon(Icons.notifications_outlined),
                 onPressed: onNotificationsTap,
-                color: const Color(0xFF1E1E1E),
+                color: scheme.onSurface,
                 constraints: const BoxConstraints(
                   minWidth: 40,
                   minHeight: 40,
