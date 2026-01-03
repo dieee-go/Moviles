@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
 
@@ -16,7 +17,15 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
   late TextEditingController _primerApellidoCtrl;
   late TextEditingController _segundoApellidoCtrl;
   late TextEditingController _emailCtrl;
-  late TextEditingController _carreraCtrl;
+  
+  List<Map<String, dynamic>> _allInterests = [];
+  Set<String> _selectedInterestIds = {};
+  
+  List<Map<String, dynamic>> _carreras = [];
+  List<Map<String, dynamic>> _departamentos = [];
+  String? _selectedCarreraId;
+  String? _selectedDepartamentoId;
+  String? _userRole;
   
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
@@ -32,7 +41,6 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     _primerApellidoCtrl = TextEditingController();
     _segundoApellidoCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
-    _carreraCtrl = TextEditingController();
     
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -52,7 +60,6 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     _primerApellidoCtrl.dispose();
     _segundoApellidoCtrl.dispose();
     _emailCtrl.dispose();
-    _carreraCtrl.dispose();
     _slideController.dispose();
     _focusNode?.dispose();
     super.dispose();
@@ -76,7 +83,67 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
       _primerApellidoCtrl.text = data['primer_apellido'] as String? ?? '';
       _segundoApellidoCtrl.text = data['segundo_apellido'] as String? ?? '';
       _emailCtrl.text = data['email'] as String? ?? '';
-      _carreraCtrl.text = data['carrera'] as String? ?? '';
+      
+      // Get user's role
+      _userRole = data['role'] as String?;
+      
+      // Load all carreras
+      final carreras = await supabase
+          .from('carreras')
+          .select('id, name')
+          .order('name');
+      _carreras = List<Map<String, dynamic>>.from(carreras);
+      
+      // Load all departamentos
+      final departamentos = await supabase
+          .from('departamentos')
+          .select('id, name')
+          .order('name');
+      _departamentos = List<Map<String, dynamic>>.from(departamentos);
+      
+      // Load user's selected carrera (if student)
+      if (_userRole == 'student') {
+        final userCarrera = await supabase
+            .from('user_carrera')
+            .select('carrera_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (userCarrera != null) {
+          _selectedCarreraId = userCarrera['carrera_id'] as String?;
+        }
+      }
+      
+      // Load user's selected departamento (if organizer)
+      if (_userRole == 'organizer') {
+        final userDepartamento = await supabase
+            .from('user_departamento')
+            .select('departamento_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (userDepartamento != null) {
+          _selectedDepartamentoId = userDepartamento['departamento_id'] as String?;
+        }
+      }
+      
+      // Load all available interests
+      final interests = await supabase
+          .from('interests')
+          .select('id, name')
+          .order('name');
+      _allInterests = List<Map<String, dynamic>>.from(interests);
+      
+      // Load user's selected interests
+      final userInterests = await supabase
+          .from('user_interests')
+          .select('interest_id')
+          .eq('user_id', userId);
+      
+      _selectedInterestIds = (userInterests as List)
+          .map((item) => item['interest_id'] as String)
+          .toSet();
+      
+      debugPrint('Loaded ${_allInterests.length} total interests');
+      debugPrint('User has ${_selectedInterestIds.length} selected interests: $_selectedInterestIds');
     } catch (e) {
       if (mounted) {
         context.showSnackBar('Error cargando perfil: $e', isError: true);
@@ -99,8 +166,67 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         'primer_apellido': _primerApellidoCtrl.text.trim(),
         'segundo_apellido': _segundoApellidoCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
-        'carrera': _carreraCtrl.text.trim(),
       }).eq('id', userId);
+
+      // Upsert interests (insert if not exists, ignore if already exists)
+      // This is more efficient than delete + insert
+      if (_selectedInterestIds.isNotEmpty) {
+        final interestsToUpsert = _selectedInterestIds
+            .map((interestId) => {
+                  'user_id': userId,
+                  'interest_id': interestId,
+                })
+            .toList();
+        
+        debugPrint('Upserting ${interestsToUpsert.length} interests');
+        await supabase
+            .from('user_interests')
+            .upsert(
+              interestsToUpsert,
+              onConflict: 'user_id,interest_id',
+            );
+        debugPrint('Successfully upserted interests');
+      } else {
+        // Delete all interests if none selected
+        await supabase
+            .from('user_interests')
+            .delete()
+            .eq('user_id', userId);
+      }
+
+      // Handle carrera for students
+      if (_userRole == 'student') {
+        // Delete existing carrera
+        await supabase
+            .from('user_carrera')
+            .delete()
+            .eq('user_id', userId);
+
+        // Insert new carrera if selected
+        if (_selectedCarreraId != null) {
+          await supabase.from('user_carrera').insert({
+            'user_id': userId,
+            'carrera_id': _selectedCarreraId,
+          });
+        }
+      }
+
+      // Handle departamento for organizers
+      if (_userRole == 'organizer') {
+        // Delete existing departamento
+        await supabase
+            .from('user_departamento')
+            .delete()
+            .eq('user_id', userId);
+
+        // Insert new departamento if selected
+        if (_selectedDepartamentoId != null) {
+          await supabase.from('user_departamento').insert({
+            'user_id': userId,
+            'departamento_id': _selectedDepartamentoId,
+          });
+        }
+      }
 
       if (mounted) {
         context.showSnackBar('Perfil actualizado');
@@ -195,39 +321,66 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_loading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text("Editar Perfil"),
-          centerTitle: true,
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text("Editar Perfil"),
+            centerTitle: true,
+            backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+            elevation: 0,
+            titleTextStyle: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+            iconTheme: IconThemeData(
+              color: isDark ? Colors.white : Colors.black,
+            ),
+          ),
+          body: _buildLoadingSkeleton(),
         ),
-        body: _buildLoadingSkeleton(),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Editar Perfil"),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-      backgroundColor: isDark 
-        ? scheme.surface 
-        : Colors.grey[50],
-      body: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.1, 0),
-          end: Offset.zero,
-        ).animate(_slideAnimation),
-        child: FadeTransition(
-          opacity: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Editar Perfil"),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+          titleTextStyle: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          iconTheme: IconThemeData(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isDark 
+          ? scheme.surface 
+          : Colors.grey[50],
+        body: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.1, 0),
+            end: Offset.zero,
+          ).animate(_slideAnimation),
+          child: FadeTransition(
+            opacity: _slideAnimation,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // Sección de Nombre
                   _buildSectionHeader(
                     icon: Icons.person,
@@ -284,18 +437,32 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
 
                   const SizedBox(height: 16),
 
-                  // Sección de Académica
+                  // Sección de Intereses
                   _buildSectionHeader(
-                    icon: Icons.school,
-                    title: 'Información Académica',
+                    icon: Icons.interests,
+                    title: 'Mis Intereses',
                   ),
                   const SizedBox(height: 20),
-                  _buildCustomTextField(
-                    controller: _carreraCtrl,
-                    label: 'Carrera/Departamento',
-                    hint: 'Ej: Ingeniería en Informática',
-                    icon: Icons.school_outlined,
-                  ),
+                  _buildInterestsSection(),
+
+                  const SizedBox(height: 16),
+
+                  // Sección de Académica o Departamento (según rol)
+                  if (_userRole == 'student') ...[
+                    _buildSectionHeader(
+                      icon: Icons.school,
+                      title: 'Información Académica',
+                    ),
+                    const SizedBox(height: 20),
+                    _buildCarreraDropdown(),
+                  ] else if (_userRole == 'organizer') ...[
+                    _buildSectionHeader(
+                      icon: Icons.business,
+                      title: 'Departamento',
+                    ),
+                    const SizedBox(height: 20),
+                    _buildDepartamentoDropdown(),
+                  ],
 
                   const SizedBox(height: 40),
 
@@ -361,6 +528,159 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
             ),
           ),
         ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInterestsSection() {
+    final scheme = Theme.of(context).colorScheme;
+    
+    if (_allInterests.isEmpty) {
+      return Center(
+        child: Text(
+          'No hay intereses disponibles',
+          style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
+        ),
+      );
+    }
+    
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _allInterests.map((interest) {
+        final id = interest['id'] as String;
+        final name = interest['name'] as String;
+        final isSelected = _selectedInterestIds.contains(id);
+        
+        return FilterChip(
+          label: Text(name),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _selectedInterestIds.add(id);
+              } else {
+                _selectedInterestIds.remove(id);
+              }
+            });
+          },
+          backgroundColor: Colors.transparent,
+          side: BorderSide(
+            color: isSelected ? scheme.primary : scheme.outline.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+          labelStyle: TextStyle(
+            color: isSelected ? scheme.primary : scheme.onSurface,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCarreraDropdown() {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        initialValue: _selectedCarreraId,
+        hint: const Text('Selecciona tu carrera'),
+        items: _carreras.map((carrera) {
+          return DropdownMenuItem<String>(
+            value: carrera['id'] as String,
+            child: Text(carrera['name'] as String),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() => _selectedCarreraId = value);
+        },
+        decoration: InputDecoration(
+          labelText: 'Carrera',
+          prefixIcon: const Icon(Icons.school_outlined),
+          filled: true,
+          fillColor: isDark
+              ? Colors.grey[900]?.withValues(alpha: 0.3)
+              : Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.primary,
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDepartamentoDropdown() {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        initialValue: _selectedDepartamentoId,
+        hint: const Text('Selecciona tu departamento'),
+        items: _departamentos.map((departamento) {
+          return DropdownMenuItem<String>(
+            value: departamento['id'] as String,
+            child: Text(departamento['name'] as String),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() => _selectedDepartamentoId = value);
+        },
+        decoration: InputDecoration(
+          labelText: 'Departamento',
+          prefixIcon: const Icon(Icons.business_outlined),
+          filled: true,
+          fillColor: isDark
+              ? Colors.grey[900]?.withValues(alpha: 0.3)
+              : Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: scheme.primary,
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
       ),
     );
   }
@@ -398,27 +718,43 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     );
   }
 
-  Scaffold _buildLoadingSkeleton() {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            Skeletons.form(fields: 6, fieldHeight: 56, spacing: 16),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(child: Skeletons.box(height: 52, radius: 12)),
-                const SizedBox(width: 12),
-                Expanded(child: Skeletons.box(height: 52, radius: 12)),
-              ],
-            ),
-          ],
-        ),
+  Widget _buildLoadingSkeleton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Skeletons.form(
+            fields: 6,
+            fieldHeight: 56,
+            spacing: 16,
+            baseColor: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+          ),
+          const SizedBox(height: 32),
+          Row(
+            children: [
+              Expanded(
+                child: Skeletons.box(
+                  height: 52,
+                  radius: 12,
+                  baseColor: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Skeletons.box(
+                  height: 52,
+                  radius: 12,
+                  baseColor: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

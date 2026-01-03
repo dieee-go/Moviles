@@ -40,10 +40,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           .select(
             'id, name, description, image_url, event_datetime, location_id,'
             ' locations(name),'
-            ' organizer:organizer_id(nombre, primer_apellido, segundo_apellido, email)'
+            ' organizer:organizer_id(nombre, primer_apellido, segundo_apellido, email, avatar_url)'
           )
           .eq('id', widget.eventId)
           .single();
+
+      // Load event categories/interests
+      final categoriesData = await supabase
+          .from('event_interests')
+          .select('interest_id, interests(id, name)')
+          .eq('event_id', widget.eventId);
+
+      final categories = (categoriesData as List)
+          .map((item) => item['interests'] as Map<String, dynamic>)
+          .toList();
 
       final userId = supabase.auth.currentUser?.id;
       bool registered = false;
@@ -71,6 +81,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
       setState(() {
         _event = data;
+        _event!['categories'] = categories;
         _isRegistered = registered;
         _userRole = role;
         _loading = false;
@@ -116,6 +127,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return email?.isNotEmpty == true ? email : null;
   }
 
+  Widget _buildOrganizerAvatar(Map<String, dynamic>? organizerData, ColorScheme scheme, bool isDark) {
+    final avatarUrl = organizerData?['avatar_url'] as String?;
+
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundImage: NetworkImage(avatarUrl),
+        onBackgroundImageError: (exception, stackTrace) {},
+        child: avatarUrl.isEmpty
+            ? Icon(Icons.person, color: scheme.primary, size: 24)
+            : null,
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.iconContainerBackground,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(Icons.person, color: scheme.primary, size: 24),
+      );
+    }
+  }
+
   Future<void> _registerToEvent() async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
@@ -145,6 +180,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     if (_loading) {
       return _buildDetailSkeleton();
@@ -167,7 +203,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final organizer = _formatOrganizer(organizerData);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? scheme.surface : Colors.white,
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -227,7 +263,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       // Título
                       Text(
                         name,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -259,12 +299,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                     children: [
                                       Text(
                                         'Fecha y hora',
-                                        style: TextStyle(fontSize: 12, color: scheme.secondaryText),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark ? Colors.grey[400] : scheme.secondaryText,
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         dateTime,
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : scheme.onSurface,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -272,7 +319,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Divider(color: scheme.dividerColor, thickness: 1),
+                            Divider(
+                              color: isDark ? Colors.grey[700] : scheme.dividerColor,
+                              thickness: 1,
+                            ),
                             const SizedBox(height: 16),
                             // Ubicación
                             Row(
@@ -292,12 +342,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                     children: [
                                       Text(
                                         'Ubicación',
-                                        style: TextStyle(fontSize: 12, color: scheme.secondaryText),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark ? Colors.grey[400] : scheme.secondaryText,
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         location ?? 'Sin ubicación',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : scheme.onSurface,
+                                        ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -312,22 +369,73 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       const SizedBox(height: 24),
 
                       // Sección "Acerca del evento"
-                      const Text(
+                      Text(
                         'Acerca del evento',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         description.isEmpty ? 'No hay descripción disponible' : description,
-                        style: TextStyle(fontSize: 15, color: scheme.secondaryText, height: 1.5),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isDark ? Colors.grey[300] : scheme.secondaryText,
+                          height: 1.5,
+                        ),
                       ),
                       const SizedBox(height: 24),
 
+                      // Sección "Categorías"
+                      if (_event!['categories'] != null && (_event!['categories'] as List).isNotEmpty) ...[
+                        Text(
+                          'Categorías',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: (_event!['categories'] as List).map((category) {
+                            final catName = category['name'] as String;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: scheme.primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                catName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
                       // Sección "Organizador"
                       if (organizer != null) ...[
-                        const Text(
+                        Text(
                           'Organizador',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Container(
@@ -339,19 +447,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                           child: Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: scheme.iconContainerBackground,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.person, color: scheme.primary, size: 24),
-                              ),
+                              _buildOrganizerAvatar(organizerData, scheme, isDark),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   organizer,
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : scheme.onSurface,
+                                  ),
                                 ),
                               ),
                             ],
@@ -439,10 +544,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   margin: const EdgeInsets.all(8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: isDark ? Colors.grey[800]!.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.9),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back, color: Colors.black87),
+                  child: Icon(
+                    Icons.arrow_back,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
               ),
             ),
@@ -478,7 +586,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Scaffold _buildDetailSkeleton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = isDark ? Colors.grey[800]! : Colors.grey[200]!;
+    
     return Scaffold(
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -486,7 +598,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           children: [
             AspectRatio(
               aspectRatio: 5 / 4,
-              child: Skeletons.box(),
+              child: Skeletons.box(baseColor: baseColor),
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -494,7 +606,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Título
-                  Skeletons.box(width: 240, height: 26, radius: 10),
+                  Skeletons.box(width: 240, height: 26, radius: 10, baseColor: baseColor),
                   const SizedBox(height: 20),
 
                   // Card fecha / ubicación
@@ -508,34 +620,34 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       children: [
                         Row(
                           children: [
-                            Skeletons.box(width: 44, height: 44, radius: 10),
+                            Skeletons.box(width: 44, height: 44, radius: 10, baseColor: baseColor),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Skeletons.box(width: 90, height: 12, radius: 6),
+                                  Skeletons.box(width: 90, height: 12, radius: 6, baseColor: baseColor),
                                   const SizedBox(height: 6),
-                                  Skeletons.box(width: 180, height: 16, radius: 8),
+                                  Skeletons.box(width: 180, height: 16, radius: 8, baseColor: baseColor),
                                 ],
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Skeletons.box(height: 1, radius: 1),
+                        Skeletons.box(height: 1, radius: 1, baseColor: baseColor),
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            Skeletons.box(width: 44, height: 44, radius: 10),
+                            Skeletons.box(width: 44, height: 44, radius: 10, baseColor: baseColor),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Skeletons.box(width: 80, height: 12, radius: 6),
+                                  Skeletons.box(width: 80, height: 12, radius: 6, baseColor: baseColor),
                                   const SizedBox(height: 6),
-                                  Skeletons.box(width: 200, height: 16, radius: 8),
+                                  Skeletons.box(width: 200, height: 16, radius: 8, baseColor: baseColor),
                                 ],
                               ),
                             ),
@@ -547,17 +659,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 24),
 
                   // Acerca del evento
-                  Skeletons.box(width: 160, height: 18, radius: 8),
+                  Skeletons.box(width: 160, height: 18, radius: 8, baseColor: baseColor),
                   const SizedBox(height: 12),
-                  Skeletons.box(height: 14, radius: 6),
+                  Skeletons.box(height: 14, radius: 6, baseColor: baseColor),
                   const SizedBox(height: 8),
-                  Skeletons.box(width: double.infinity, height: 14, radius: 6),
+                  Skeletons.box(width: double.infinity, height: 14, radius: 6, baseColor: baseColor),
                   const SizedBox(height: 8),
-                  Skeletons.box(width: 220, height: 14, radius: 6),
+                  Skeletons.box(width: 220, height: 14, radius: 6, baseColor: baseColor),
                   const SizedBox(height: 24),
 
                   // Organizador
-                  Skeletons.box(width: 140, height: 18, radius: 8),
+                  Skeletons.box(width: 140, height: 18, radius: 8, baseColor: baseColor),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -567,10 +679,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        Skeletons.box(width: 44, height: 44, radius: 10),
+                        Skeletons.box(width: 44, height: 44, radius: 10, baseColor: baseColor),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Skeletons.box(width: double.infinity, height: 16, radius: 8),
+                          child: Skeletons.box(width: double.infinity, height: 16, radius: 8, baseColor: baseColor),
                         ),
                       ],
                     ),
@@ -578,9 +690,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 24),
 
                   // Botones
-                  Skeletons.box(height: 52, radius: 12),
+                  Skeletons.box(height: 52, radius: 12, baseColor: baseColor),
                   const SizedBox(height: 12),
-                  Skeletons.box(height: 52, radius: 12),
+                  Skeletons.box(height: 52, radius: 12, baseColor: baseColor),
                 ],
               ),
             ),
