@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
+
 import '../../components/skeletons.dart';
 import '../../main.dart';
 import '../../theme/app_theme_extensions.dart';
+import '../../utils/image_crop_helper.dart';
 
 class EditEventScreen extends StatefulWidget {
   final String eventId;
@@ -114,23 +114,33 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   Future<void> _pickImage() async {
     try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-      if (pickedFile == null) return;
+      final selection = await ImageCropHelper.pickOriginalAndCropped(ratio: 5.0 / 4.0);
+      if (selection == null) return;
+      final (picked, cropped) = selection;
 
       setState(() => _uploadingImage = true);
 
       final fileName = 'event_${widget.eventId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final filePath = 'events/$fileName';
+      final originalPath = 'events/originals/$fileName';
+      final thumbPath = 'events/thumbs/$fileName';
 
-      await supabase.storage.from('events').upload(
-        filePath,
-        File(pickedFile.path),
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-      );
+      await supabase.storage.from('events').uploadBinary(
+            originalPath,
+            await picked.readAsBytes(),
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              upsert: true,
+              contentType: picked.mimeType ?? 'image/jpeg',
+            ),
+          );
 
-      final publicUrl = supabase.storage.from('events').getPublicUrl(filePath);
+      await supabase.storage.from('events').uploadBinary(
+            thumbPath,
+            await cropped.readAsBytes(),
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true, contentType: 'image/jpeg'),
+          );
+
+      final publicUrl = supabase.storage.from('events').getPublicUrl(thumbPath);
 
       setState(() {
         _imageUrl = publicUrl;

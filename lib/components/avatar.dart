@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unieventos/main.dart';
 
+import '../utils/image_crop_helper.dart';
+
 class Avatar extends StatefulWidget {
-  const Avatar({
-    super.key,
-    required this.imageUrl,
-    required this.onUpload,
-  });
+  const Avatar({super.key, required this.imageUrl, required this.onUpload});
 
   final String? imageUrl;
   final void Function(String) onUpload;
@@ -26,38 +23,47 @@ class _AvatarState extends State<Avatar> {
       alignment: Alignment.center,
       children: [
         // Avatar circular
-        Container(
-          width: 150,
-          height: 150,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-              width: 2,
+        GestureDetector(
+          onTap: (widget.imageUrl ?? '').isEmpty ? null : () => _openViewer(widget.imageUrl!),
+          child: Container(
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.2),
+                width: 2,
+              ),
             ),
-          ),
-          child: ClipOval(
-            child: widget.imageUrl == null || widget.imageUrl!.isEmpty
-                ? Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  )
-                : Image.network(
-                    widget.imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: ClipOval(
+              child: widget.imageUrl == null || widget.imageUrl!.isEmpty
+                  ? Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       child: Icon(
                         Icons.person,
                         size: 60,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    )
+                  : Image.network(
+                      widget.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                  ),
+            ),
           ),
         ),
         // Botón de edición en la esquina inferior derecha
@@ -84,32 +90,42 @@ class _AvatarState extends State<Avatar> {
   }
 
   Future<void> _upload() async {
-    final picker = ImagePicker();
-    final imageFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 300,
-      maxHeight: 300,
-    );
-    if (imageFile == null) {
-      return;
-    }
+    final selection = await ImageCropHelper.pickOriginalAndCropped(ratio: 1.0);
+    if (selection == null) return;
+    final (picked, cropped) = selection;
+
     setState(() => _isLoading = true);
 
     try {
-      final bytes = await imageFile.readAsBytes();
-      final fileExt = imageFile.path.split('.').last;
-      final fileName = '${DateTime.now().toIso8601String()}.$fileExt';
+      final originalBytes = await ImageCropHelper.compressToMaxBytes(await picked.readAsBytes());
+      final croppedBytes = await ImageCropHelper.compressToMaxBytes(await cropped.readAsBytes());
+
       final user = supabase.auth.currentUser;
-      final filePath = user != null ? '${user.id}/$fileName' : fileName;
+      final userPrefix = user != null ? '${user.id}/' : '';
+      final timestamp = DateTime.now().toIso8601String();
+      final contentType = picked.mimeType ?? 'image/jpeg';
+
+      // 1) Subir original
+      final originalPath = '${userPrefix}originals/avatar_$timestamp.jpg';
       await supabase.storage.from('avatars').uploadBinary(
-            filePath,
-            bytes,
-            fileOptions: FileOptions(contentType: imageFile.mimeType, upsert: true),
+            originalPath,
+            originalBytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
-      final imageUrlResponse = await supabase.storage
+
+      // 2) Subir recortada (thumb)
+      final thumbPath = '${userPrefix}thumbs/avatar_$timestamp.jpg';
+      await supabase.storage.from('avatars').uploadBinary(
+            thumbPath,
+            croppedBytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+          );
+
+      final thumbUrl = await supabase.storage
           .from('avatars')
-          .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 10);
-      widget.onUpload(imageUrlResponse);
+          .createSignedUrl(thumbPath, 60 * 60 * 24 * 365 * 10);
+
+      widget.onUpload(thumbUrl);
     } on StorageException catch (error) {
       if (mounted) {
         context.showSnackBar(error.message, isError: true);
@@ -121,5 +137,30 @@ class _AvatarState extends State<Avatar> {
     }
 
     setState(() => _isLoading = false);
+  }
+
+  void _openViewer(String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Container(
+          color: Colors.transparent,
+          alignment: Alignment.center,
+          child: InteractiveViewer(
+            minScale: 0.8,
+            maxScale: 4,
+            child: Hero(
+              tag: 'avatar-viewer',
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

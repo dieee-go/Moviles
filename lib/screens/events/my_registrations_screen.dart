@@ -215,7 +215,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          Navigator.pushNamed(context, '/event_detail', arguments: item.eventId);
+          Navigator.pushNamed(context, '/event-detail', arguments: item.eventId);
         },
         child: Padding(
           padding: const EdgeInsets.all(12),
