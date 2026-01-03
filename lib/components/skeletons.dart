@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 /// Reusable skeleton helpers to replace spinners during loading.
 class Skeletons {
-  static Widget box({double width = double.infinity, double height = 14, double radius = 8}) {
+  static Widget box({
+    double width = double.infinity,
+    double height = 14,
+    double radius = 8,
+    Color? baseColor,
+  }) {
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.grey.shade300,
+        color: baseColor ?? Colors.grey.shade300,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -95,13 +100,23 @@ class Skeletons {
     );
   }
 
-  static Widget form({int fields = 5, double fieldHeight = 50, double spacing = 14}) {
+  static Widget form({
+    int fields = 5,
+    double fieldHeight = 50,
+    double spacing = 14,
+    Color? baseColor,
+    Color? highlightColor,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(fields, (i) {
         return Padding(
           padding: EdgeInsets.only(bottom: i == fields - 1 ? 0 : spacing),
-          child: box(height: fieldHeight, radius: 10),
+          child: box(
+            height: fieldHeight,
+            radius: 10,
+            baseColor: baseColor,
+          ),
         );
       }),
     );

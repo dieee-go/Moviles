@@ -16,6 +16,9 @@ class _InicioPageState extends State<InicioPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   List<Map<String, dynamic>> _allEvents = [];
   List<Map<String, dynamic>> _categories = [];
+  List<String> _userInterests = [];
+  List<String> _registeredEventIds = [];
+  String _searchTerm = '';
   final ValueNotifier<String?> _selectedCategoryIdNotifier = ValueNotifier<String?>(null);
   bool _loading = true;
 
@@ -44,11 +47,32 @@ class _InicioPageState extends State<InicioPage> {
       final events = await supabase
           .from('events')
           .select(
-            'id, name, image_url, created_at, event_datetime, location_id, locations(name), event_interests(interest_id)',
+            'id, name, image_url, created_at, event_datetime, location_id, locations(name), event_interests(interest_id), registrations_count:event_registrations(count)',
           )
           .order('event_datetime', ascending: false);
 
       _allEvents = List<Map<String, dynamic>>.from(events);
+
+      // Load current user's interests and registered events
+      final userId = supabase.auth.currentUser?.id;
+      if (userId != null) {
+        final userInterstList = await supabase
+            .from('user_interests')
+            .select('interest_id')
+            .eq('user_id', userId);
+        _userInterests = (userInterstList as List)
+            .map((item) => item['interest_id'] as String)
+            .toList();
+
+        // Load user's registered events
+        final registeredEvents = await supabase
+            .from('event_registrations')
+            .select('event_id')
+            .eq('user_id', userId);
+        _registeredEventIds = (registeredEvents as List)
+            .map((item) => item['event_id'] as String)
+            .toList();
+      }
     } on PostgrestException catch (e) {
       if (mounted) {
         context.showSnackBar('Error BD: ${e.message}', isError: true);
@@ -75,8 +99,27 @@ class _InicioPageState extends State<InicioPage> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> source, String? categoryId) {
+    final byCategory = _filterByCategoryLocal(source, categoryId);
+    
+    // Exclude registered events
+    final notRegistered = byCategory.where((event) {
+      final eventId = event['id'] as String?;
+      return eventId == null || !_registeredEventIds.contains(eventId);
+    }).toList();
+    
+    if (_searchTerm.isEmpty) return notRegistered;
+
+    final query = _searchTerm.toLowerCase();
+    return notRegistered.where((event) {
+      final name = (event['name'] as String?) ?? '';
+      final locationName = (event['locations']?['name'] as String?) ?? '';
+      return name.toLowerCase().contains(query) || locationName.toLowerCase().contains(query);
+    }).toList();
+  }
+
   List<Map<String, dynamic>> _sortedFeatured(List<Map<String, dynamic>> source, String? categoryId) {
-    final filtered = _filterByCategoryLocal(source, categoryId);
+    final filtered = _applyFilters(source, categoryId);
     filtered.sort((a, b) {
       final da = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -86,23 +129,80 @@ class _InicioPageState extends State<InicioPage> {
   }
 
   List<Map<String, dynamic>> _sortedPopular(List<Map<String, dynamic>> source, String? categoryId) {
-    final filtered = _filterByCategoryLocal(source, categoryId);
+    final filtered = _applyFilters(source, categoryId);
     filtered.sort((a, b) {
-      final da = DateTime.tryParse((a['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final db = DateTime.tryParse((b['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return db.compareTo(da);
+      // 1. Sort by registration count (descending - more registrations first)
+      int countA = 0;
+      int countB = 0;
+      
+      final regCountA = a['registrations_count'];
+      if (regCountA is List && regCountA.isNotEmpty) {
+        countA = (regCountA.first['count'] as int?) ?? 0;
+      } else if (regCountA is int) {
+        countA = regCountA;
+      }
+      
+      final regCountB = b['registrations_count'];
+      if (regCountB is List && regCountB.isNotEmpty) {
+        countB = (regCountB.first['count'] as int?) ?? 0;
+      } else if (regCountB is int) {
+        countB = regCountB;
+      }
+      
+      if (countA != countB) {
+        return countB.compareTo(countA);
+      }
+
+      // 2. If same registration count, sort by event_datetime (ascending - closest/next first)
+      final eventA = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final eventB = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      if (eventA.year != eventB.year || eventA.month != eventB.month || eventA.day != eventB.day || eventA.hour != eventB.hour) {
+        return eventA.compareTo(eventB);
+      }
+
+      // 3. If same date and time, sort by created_at (ascending - oldest/first created first)
+      final createdA = DateTime.tryParse((a['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final createdB = DateTime.tryParse((b['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return createdA.compareTo(createdB);
     });
     return filtered.take(5).toList();
   }
 
+  int _countMatchingInterests(Map<String, dynamic> event) {
+    final eventInterests = event['event_interests'] as List<dynamic>? ?? [];
+    int matchCount = 0;
+    for (var interest in eventInterests) {
+      final interestId = interest['interest_id'] as String?;
+      if (interestId != null && _userInterests.contains(interestId)) {
+        matchCount++;
+      }
+    }
+    return matchCount;
+  }
+
   List<Map<String, dynamic>> _sortedRecommended(List<Map<String, dynamic>> source, String? categoryId) {
-    final filtered = _filterByCategoryLocal(source, categoryId);
-    filtered.sort((a, b) {
-      final da = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final db = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return db.compareTo(da);
+    final filtered = _applyFilters(source, categoryId);
+    
+    // Filter to only events with at least one matching interest
+    final withMatchingInterests = filtered.where((event) {
+      return _countMatchingInterests(event) > 0;
+    }).toList();
+
+    withMatchingInterests.sort((a, b) {
+      // 1. Sort by number of matching interests (descending - most matches first)
+      final matchA = _countMatchingInterests(a);
+      final matchB = _countMatchingInterests(b);
+      if (matchA != matchB) {
+        return matchB.compareTo(matchA);
+      }
+
+      // 2. If same number of matches, sort by event_datetime (ascending - next/closest first)
+      final eventA = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final eventB = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return eventA.compareTo(eventB);
     });
-    return filtered.take(5).toList();
+    
+    return withMatchingInterests.take(5).toList();
   }
 
   String _formatDateTime(String? isoDate) {
@@ -126,8 +226,8 @@ class _InicioPageState extends State<InicioPage> {
         child: _loading
             ? _buildLoadingSkeleton()
             : SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
@@ -137,6 +237,15 @@ class _InicioPageState extends State<InicioPage> {
                         decoration: InputDecoration(
                           hintText: 'Buscar eventos...',
                           prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          suffixIcon: _searchTerm.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, color: Colors.grey),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() => _searchTerm = '');
+                                  },
+                                )
+                              : null,
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
@@ -144,12 +253,12 @@ class _InicioPageState extends State<InicioPage> {
                             borderSide: BorderSide.none,
                           ),
                         ),
-                        onSubmitted: (v) {
-                          context.showSnackBar('Búsqueda próximamente');
+                        onChanged: (value) {
+                          setState(() => _searchTerm = value.trim());
                         },
+                        onSubmitted: (_) => FocusScope.of(context).unfocus(),
                       ),
                     ),
-
                     ValueListenableBuilder<String?>(
                       valueListenable: _selectedCategoryIdNotifier,
                       builder: (context, categoryId, _) {
@@ -173,7 +282,6 @@ class _InicioPageState extends State<InicioPage> {
                         );
                       },
                     ),
-
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
@@ -187,7 +295,6 @@ class _InicioPageState extends State<InicioPage> {
                       builder: (context, categoryId, _) {
                         final popular = _sortedPopular(_allEvents, categoryId);
                         final recommended = _sortedRecommended(_allEvents, categoryId);
-
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -207,7 +314,6 @@ class _InicioPageState extends State<InicioPage> {
                               ),
                             ),
                             const SizedBox(height: 24),
-
                             const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
@@ -230,7 +336,6 @@ class _InicioPageState extends State<InicioPage> {
                                 itemBuilder: (context, i) => _buildEventListTile(popular[i]),
                               ),
                             const SizedBox(height: 24),
-
                             const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
@@ -260,7 +365,7 @@ class _InicioPageState extends State<InicioPage> {
                   ],
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -274,7 +379,6 @@ class _InicioPageState extends State<InicioPage> {
           children: [
             _skeletonBox(height: 48, radius: 12),
             const SizedBox(height: 24),
-
             _skeletonBox(width: 140, height: 18, radius: 10),
             const SizedBox(height: 12),
             SizedBox(
@@ -287,7 +391,6 @@ class _InicioPageState extends State<InicioPage> {
               ),
             ),
             const SizedBox(height: 24),
-
             _skeletonBox(width: 110, height: 18, radius: 10),
             const SizedBox(height: 12),
             Wrap(
@@ -299,7 +402,6 @@ class _InicioPageState extends State<InicioPage> {
               ),
             ),
             const SizedBox(height: 24),
-
             _skeletonBox(width: 170, height: 18, radius: 10),
             const SizedBox(height: 12),
             ...List.generate(
@@ -309,7 +411,6 @@ class _InicioPageState extends State<InicioPage> {
                 child: _eventTileSkeleton(),
               ),
             ),
-
             _skeletonBox(width: 190, height: 18, radius: 10),
             const SizedBox(height: 12),
             ...List.generate(
