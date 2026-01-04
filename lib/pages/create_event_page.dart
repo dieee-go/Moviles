@@ -113,7 +113,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
         _eventTime!.minute,
       ).toUtc();
 
-      // Insert using schema field names
+      // Insert using new separated date/time columns
       final insert = await supabase
           .from('events')
           .insert({
@@ -121,7 +121,8 @@ class _CreateEventPageState extends State<CreateEventPage> {
             'description': _descCtrl.text.trim(),
             'capacity': int.tryParse(_capacityCtrl.text.trim()) ?? 0,
             'organizer_id': user.id,
-            'event_datetime': eventDateTime.toIso8601String(),
+            'event_date': eventDateTime.toIso8601String().split('T')[0],
+            'event_time': '${_eventTime!.hour.toString().padLeft(2, '0')}:${_eventTime!.minute.toString().padLeft(2, '0')}:00',
             'location_id': _selectedLocationId,
             'image_url': _imageUrl,
           })

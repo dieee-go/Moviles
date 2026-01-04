@@ -113,8 +113,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         }
       }
       
-      // Load user's selected departamento (if organizer)
-      if (_userRole == 'organizer') {
+      // Load user's selected departamento (if organizer or admin)
+      if (_userRole == 'organizer' || _userRole == 'admin') {
         final userDepartamento = await supabase
             .from('user_departamento')
             .select('departamento_id')
@@ -211,8 +211,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         }
       }
 
-      // Handle departamento for organizers
-      if (_userRole == 'organizer') {
+      // Handle departamento for organizers or admins
+      if (_userRole == 'organizer' || _userRole == 'admin') {
         // Delete existing departamento
         await supabase
             .from('user_departamento')
@@ -455,7 +455,7 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
                     ),
                     const SizedBox(height: 20),
                     _buildCarreraDropdown(),
-                  ] else if (_userRole == 'organizer') ...[
+                  ] else if (_userRole == 'organizer' || _userRole == 'admin') ...[
                     _buildSectionHeader(
                       icon: Icons.business,
                       title: 'Departamento',
@@ -586,6 +586,7 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _selectedCarreraId,
         hint: const Text('Selecciona tu carrera'),
         items: _carreras.map((carrera) {
@@ -600,7 +601,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         decoration: InputDecoration(
           labelText: 'Carrera',
           prefixIcon: const Icon(Icons.school_outlined),
-          filled: true,
+            filled: true,
+            isDense: true,
           fillColor: isDark
               ? Colors.grey[900]?.withValues(alpha: 0.3)
               : Colors.grey[100],
@@ -624,8 +626,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
             ),
           ),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+              horizontal: 12,
+              vertical: 12,
           ),
         ),
       ),
@@ -639,6 +641,7 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _selectedDepartamentoId,
         hint: const Text('Selecciona tu departamento'),
         items: _departamentos.map((departamento) {
@@ -653,7 +656,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         decoration: InputDecoration(
           labelText: 'Departamento',
           prefixIcon: const Icon(Icons.business_outlined),
-          filled: true,
+            filled: true,
+            isDense: true,
           fillColor: isDark
               ? Colors.grey[900]?.withValues(alpha: 0.3)
               : Colors.grey[100],
@@ -677,8 +681,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
             ),
           ),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+              horizontal: 12,
+              vertical: 12,
           ),
         ),
       ),

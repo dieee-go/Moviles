@@ -25,6 +25,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   String _segundoApellido = '';
   String _email = '';
   String _carrera = '';
+  String _departamento = '';
   String _role = '';
   bool _loading = true;
   List<Map<String, dynamic>> _roleHistory = [];
@@ -69,14 +70,36 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         return;
       }
       final data = await supabase.from('profiles').select().eq('id', userId).single();
+      final role = ((data['role'] ?? '') as String).trim();
+
+      String carrera = '';
+      String departamento = '';
+
+      if (role.toLowerCase() == 'student') {
+        final uc = await supabase
+            .from('user_carrera')
+            .select('carreras(name)')
+            .eq('user_id', userId)
+            .maybeSingle();
+        carrera = (uc?['carreras']?['name'] as String?) ?? '';
+      } else if (role.toLowerCase() == 'organizer' || role.toLowerCase() == 'admin') {
+        final ud = await supabase
+            .from('user_departamento')
+            .select('departamentos(name)')
+            .eq('user_id', userId)
+            .maybeSingle();
+        departamento = (ud?['departamentos']?['name'] as String?) ?? '';
+      }
+
       setState(() {
         _nombre = (data['nombre'] ?? '') as String;
         _primerApellido = (data['primer_apellido'] ?? '') as String;
         _segundoApellido = (data['segundo_apellido'] ?? '') as String;
         _email = (data['email'] ?? supabase.auth.currentUser?.email ?? '') as String;
-        _carrera = (data['carrera'] ?? '') as String;
+        _carrera = carrera;
+        _departamento = departamento;
         _avatarUrl = (data['avatar_url'] ?? '') as String;
-        _role = ((data['role'] ?? '') as String).trim();
+        _role = role;
       });
       if (mounted) _fadeController.forward();
       // Cargar estadísticas DESPUÉS de obtener el rol
@@ -104,9 +127,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         // Para estudiantes: eventos próximos a los que están registrados
         final upcoming = await supabase
             .from('event_registrations')
-            .select('event_id, events!inner(event_datetime)')
+            .select('event_id, events!inner(event_date, event_time)')
             .eq('user_id', userId)
-            .gte('events.event_datetime', DateTime.now().toIso8601String());
+            .gte('events.event_date', DateTime.now().toIso8601String().split('T')[0]);
         
         eventsCount = upcoming.length;
       } else {
@@ -469,12 +492,20 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             color: Colors.blue,
           ),
           const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.school_outlined,
-            label: 'Carrera',
-            value: _carrera.isEmpty ? 'No especificada' : _carrera,
-            color: Colors.purple,
-          ),
+          if (_role.toLowerCase().trim() == 'student')
+            _buildInfoCard(
+              icon: Icons.school_outlined,
+              label: 'Carrera',
+              value: _carrera.isEmpty ? 'No especificada' : _carrera,
+              color: Colors.purple,
+            )
+          else
+            _buildInfoCard(
+              icon: Icons.business_outlined,
+              label: 'Departamento',
+              value: _departamento.isEmpty ? 'No especificado' : _departamento,
+              color: Colors.blueGrey,
+            ),
         ],
       ),
     );
