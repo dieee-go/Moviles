@@ -47,9 +47,10 @@ class _InicioPageState extends State<InicioPage> {
       final events = await supabase
           .from('events')
           .select(
-            'id, name, image_url, created_at, event_datetime, location_id, locations(name), event_interests(interest_id), registrations_count:event_registrations(count)',
+            'id, name, image_url, created_at, event_date, event_time, location_id, locations(name), event_interests(interest_id), registrations_count:event_registrations(count)',
           )
-          .order('event_datetime', ascending: false);
+          .order('event_date', ascending: false)
+          .order('event_time', ascending: false);
 
       _allEvents = List<Map<String, dynamic>>.from(events);
 
@@ -118,11 +119,23 @@ class _InicioPageState extends State<InicioPage> {
     }).toList();
   }
 
+  DateTime? _eventDateTime(Map<String, dynamic> event) {
+    final dateStr = event['event_date'] as String?;
+    final timeStr = event['event_time'] as String?;
+    if (dateStr == null || timeStr == null) return null;
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return null;
+    final parts = timeStr.split(':');
+    final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
   List<Map<String, dynamic>> _sortedFeatured(List<Map<String, dynamic>> source, String? categoryId) {
     final filtered = _applyFilters(source, categoryId);
     filtered.sort((a, b) {
-      final da = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final db = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final da = _eventDateTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = _eventDateTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
       return db.compareTo(da);
     });
     return filtered.take(3).toList();
@@ -153,9 +166,9 @@ class _InicioPageState extends State<InicioPage> {
         return countB.compareTo(countA);
       }
 
-      // 2. If same registration count, sort by event_datetime (ascending - closest/next first)
-      final eventA = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final eventB = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      // 2. If same registration count, sort by date+time (ascending - closest/next first)
+      final eventA = _eventDateTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final eventB = _eventDateTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
       if (eventA.year != eventB.year || eventA.month != eventB.month || eventA.day != eventB.day || eventA.hour != eventB.hour) {
         return eventA.compareTo(eventB);
       }
@@ -196,20 +209,21 @@ class _InicioPageState extends State<InicioPage> {
         return matchB.compareTo(matchA);
       }
 
-      // 2. If same number of matches, sort by event_datetime (ascending - next/closest first)
-      final eventA = DateTime.tryParse((a['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final eventB = DateTime.tryParse((b['event_datetime'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      // 2. If same number of matches, sort by date+time (ascending - next/closest first)
+      final eventA = _eventDateTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final eventB = _eventDateTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
       return eventA.compareTo(eventB);
     });
     
     return withMatchingInterests.take(5).toList();
   }
 
-  String _formatDateTime(String? isoDate) {
-    if (isoDate == null) return '';
+  String _formatDateTime(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return '';
     try {
-      final dt = DateTime.parse(isoDate).toLocal();
-      final months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      final dt = _eventDateTime({'event_date': dateStr, 'event_time': timeStr});
+      if (dt == null) return '';
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       return '${dt.day} de ${months[dt.month - 1]}, ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
@@ -503,7 +517,7 @@ class _InicioPageState extends State<InicioPage> {
   Widget _buildFeaturedCard(Map<String, dynamic> event) {
     final imageUrl = event['image_url'] as String?;
     final name = event['name'] as String? ?? 'Sin título';
-    final dateTime = _formatDateTime(event['event_datetime'] as String?);
+    final dateTime = _formatDateTime(event['event_date'] as String?, event['event_time'] as String?);
 
     return Container(
       width: 300,
@@ -630,7 +644,7 @@ class _InicioPageState extends State<InicioPage> {
   Widget _buildEventListTile(Map<String, dynamic> event) {
     final imageUrl = event['image_url'] as String?;
     final name = event['name'] as String? ?? 'Sin título';
-    final dateTime = _formatDateTime(event['event_datetime'] as String?);
+    final dateTime = _formatDateTime(event['event_date'] as String?, event['event_time'] as String?);
     final locationData = event['locations'];
     final location = locationData != null ? locationData['name'] as String? : null;
 

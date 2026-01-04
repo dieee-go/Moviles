@@ -38,9 +38,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       final data = await supabase
           .from('events')
           .select(
-            'id, name, description, image_url, event_datetime, location_id,'
+            'id, name, description, image_url, event_date, event_time, location_id, organizer_id,'
             ' locations(name),'
-            ' organizer:organizer_id(nombre, primer_apellido, segundo_apellido, email, avatar_url)'
+            ' organizer:organizer_id(id, nombre, primer_apellido, segundo_apellido, email, avatar_url)'
           )
           .eq('id', widget.eventId)
           .single();
@@ -99,12 +99,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-  String _formatDateTime(String? isoDate) {
-    if (isoDate == null) return '';
+  String _formatDateTime(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return '';
     try {
-      final dt = DateTime.parse(isoDate).toLocal();
+      final date = DateTime.parse(dateStr);
       final months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      return '${dt.day} de ${months[dt.month - 1]}, ${dt.year} - ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      final timeParts = timeStr.split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      return '${date.day} de ${months[date.month - 1]}, ${date.year} - ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
     }
@@ -160,6 +163,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       return;
     }
 
+    // Validar que el evento no ha pasado
+    final eventDateStr = _event!['event_date'] as String?;
+    final eventTimeStr = _event!['event_time'] as String?;
+    if (eventDateStr != null && eventTimeStr != null) {
+      try {
+        final dateTime = DateTime.parse(eventDateStr);
+        final timeParts = eventTimeStr.split(':');
+        final hour = int.parse(timeParts[0]);
+        final minute = int.parse(timeParts[1]);
+        final fullDateTime = DateTime(dateTime.year, dateTime.month, dateTime.day, hour, minute);
+        
+        if (fullDateTime.isBefore(DateTime.now())) {
+          if (mounted) {
+            context.showSnackBar('No puedes registrarte a un evento que ya pasó', isError: true);
+          }
+          return;
+        }
+      } catch (_) {
+        if (mounted) {
+          context.showSnackBar('Error validando la fecha del evento', isError: true);
+        }
+        return;
+      }
+    }
+
     try {
       await supabase.from('event_registrations').insert({
         'event_id': widget.eventId,
@@ -196,11 +224,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final name = _event!['name'] as String? ?? 'Sin título';
     final imageUrl = _event!['image_url'] as String?;
     final description = _event!['description'] as String? ?? '';
-    final dateTime = _formatDateTime(_event!['event_datetime'] as String?);
+    final dateTime = _formatDateTime(_event!['event_date'] as String?, _event!['event_time'] as String?);
     final locationData = _event!['locations'];
     final location = locationData != null ? locationData['name'] as String? : 'Sin ubicación';
     final organizerData = _event!['organizer'] as Map<String, dynamic>?;
     final organizer = _formatOrganizer(organizerData);
+    
+    // Validar si el evento ya pasó
+    final eventDateStr = _event!['event_date'] as String?;
+    final eventTimeStr = _event!['event_time'] as String?;
+    bool isEventPassed = false;
+    if (eventDateStr != null && eventTimeStr != null) {
+      try {
+        final dateTime = DateTime.parse(eventDateStr);
+        final timeParts = eventTimeStr.split(':');
+        final hour = int.parse(timeParts[0]);
+        final minute = int.parse(timeParts[1]);
+        final fullDateTime = DateTime(dateTime.year, dateTime.month, dateTime.day, hour, minute);
+        isEventPassed = fullDateTime.isBefore(DateTime.now());
+      } catch (_) {
+        isEventPassed = false;
+      }
+    }
 
     return Scaffold(
       backgroundColor: isDark ? scheme.surface : Colors.white,
@@ -485,21 +530,37 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                   ),
                                 ),
                               )
-                            : ElevatedButton.icon(
-                                onPressed: _registerToEvent,
-                                icon: const Icon(Icons.check_circle),
-                                label: const Text(
-                                  'Registrarse',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1976D2),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            : isEventPassed
+                                ? ElevatedButton.icon(
+                                    onPressed: null,
+                                    icon: const Icon(Icons.event_busy),
+                                    label: const Text(
+                                      'Evento finalizado',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.grey.shade400,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  )
+                                : ElevatedButton.icon(
+                                    onPressed: _registerToEvent,
+                                    icon: const Icon(Icons.check_circle),
+                                    label: const Text(
+                                      'Registrarse',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1976D2),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
                       ),
 
                       // Botón ver asistentes (solo para organizadores y admins)
@@ -555,6 +616,32 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               ),
             ),
           ),
+          // Botón de editar (solo para organizadores y admins que son dueños del evento)
+          if ((_userRole == 'organizer' || _userRole == 'admin') && _event!['organizer_id'] == supabase.auth.currentUser?.id)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: GestureDetector(
+                  onTap: () async {
+                    await Navigator.pushNamed(context, '/edit-event', arguments: widget.eventId);
+                    _loadEventDetail();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[800]!.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.edit,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

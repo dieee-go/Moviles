@@ -62,9 +62,10 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
 
       final data = await supabase
           .from('events')
-          .select('id, name, event_datetime, status, locations(name)')
+          .select('id, name, event_date, event_time, status, locations(name)')
           .eq('organizer_id', userId)
-          .order('event_datetime', ascending: false);
+          .order('event_date', ascending: false)
+          .order('event_time', ascending: false);
 
       setState(() {
         _myEvents = List<Map<String, dynamic>>.from(data);
@@ -85,29 +86,37 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
       // Obtener todos los eventos activos del usuario
       final activeEvents = await supabase
           .from('events')
-          .select('id, event_datetime')
+          .select('id, event_date, event_time')
           .eq('organizer_id', userId)
           .eq('status', 'active');
 
       // Verificar cuáles han pasado y actualizar
       for (final event in activeEvents) {
-        final eventDateTime = event['event_datetime'] as String?;
-        if (eventDateTime == null) continue;
+        final eventDateStr = event['event_date'] as String?;
+        final eventTimeStr = event['event_time'] as String?;
+        if (eventDateStr == null || eventTimeStr == null) continue;
 
-        final eventTime = DateTime.parse(eventDateTime).toLocal();
-        if (eventTime.isBefore(now)) {
-          // El evento ya pasó, actualizar a 'done'
-          await supabase
-              .from('events')
-              .update({'status': 'done'})
-              .eq('id', event['id']);
+        try {
+          final eventDate = DateTime.parse(eventDateStr);
+          final timeParts = eventTimeStr.split(':');
+          final hour = int.parse(timeParts[0]);
+          final minute = int.parse(timeParts[1]);
+          final eventTime = DateTime(eventDate.year, eventDate.month, eventDate.day, hour, minute);
+          
+          if (eventTime.isBefore(now)) {
+            // El evento ya pasó, actualizar a 'done'
+            await supabase
+                .from('events')
+                .update({'status': 'done'})
+                .eq('id', event['id']);
+          }
+        } catch (_) {
+          // Ignorar errores de parsing
+          continue;
         }
       }
     } catch (e) {
       // Silenciar errores de actualización para no interrumpir la carga
-      if (mounted) {
-        // Opcionalmente log el error
-      }
     }
   }
 
@@ -141,37 +150,54 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
     }
   }
 
-  String _formatDateTime(String? dateStr) {
-    if (dateStr == null) return '';
-    final dt = DateTime.tryParse(dateStr)?.toLocal();
-    if (dt == null) return '';
-    final day = dt.day.toString().padLeft(2, '0');
-    final month = dt.month.toString().padLeft(2, '0');
-    final year = dt.year.toString();
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    return '$day/$month/$year $hour:$minute';
+  String _formatDateTime(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return '';
+    try {
+      final parts = timeStr.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      final date = DateTime.parse(dateStr).toLocal();
+      final dt = DateTime(date.year, date.month, date.day, hour, minute);
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      final datePart = '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
+      final hour12 = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      final timePart = '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
+      return '$datePart · $timePart';
+    } catch (_) {
+      return '';
+    }
   }
 
   List<Map<String, dynamic>> _applySortAndFilter(String sort) {
     List<Map<String, dynamic>> list = List.from(_myEvents);
 
     list.sort((a, b) {
-      final dateA = DateTime.tryParse(a['event_datetime'] as String? ?? '')?.toLocal() ?? DateTime(1900);
-      final dateB = DateTime.tryParse(b['event_datetime'] as String? ?? '')?.toLocal() ?? DateTime(1900);
+      final dateA = DateTime.tryParse(a['event_date'] as String? ?? '')?.toLocal() ?? DateTime(1900);
+      final timeA = (a['event_time'] as String? ?? '').split(':');
+      final hourA = timeA.isNotEmpty ? int.tryParse(timeA[0]) ?? 0 : 0;
+      final minA = timeA.length > 1 ? int.tryParse(timeA[1]) ?? 0 : 0;
+      final dateTimeA = DateTime(dateA.year, dateA.month, dateA.day, hourA, minA);
+      
+      final dateB = DateTime.tryParse(b['event_date'] as String? ?? '')?.toLocal() ?? DateTime(1900);
+      final timeB = (b['event_time'] as String? ?? '').split(':');
+      final hourB = timeB.isNotEmpty ? int.tryParse(timeB[0]) ?? 0 : 0;
+      final minB = timeB.length > 1 ? int.tryParse(timeB[1]) ?? 0 : 0;
+      final dateTimeB = DateTime(dateB.year, dateB.month, dateB.day, hourB, minB);
+      
       final nameA = (a['name'] as String? ?? '').toLowerCase();
       final nameB = (b['name'] as String? ?? '').toLowerCase();
 
       switch (sort) {
         case 'date_desc':
-          return dateB.compareTo(dateA);
+          return dateTimeB.compareTo(dateTimeA);
         case 'name_asc':
           return nameA.compareTo(nameB);
         case 'name_desc':
           return nameB.compareTo(nameA);
         case 'date_asc':
         default:
-          return dateA.compareTo(dateB);
+          return dateTimeA.compareTo(dateTimeB);
       }
     });
 
@@ -310,7 +336,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
                               ...list.map((event) {
                             final eventId = event['id'] as String;
                             final name = event['name'] as String? ?? 'Sin título';
-                            final dateTime = event['event_datetime'] as String?;
+                            final eventDate = event['event_date'] as String?;
+                            final eventTime = event['event_time'] as String?;
                             final statusStr = event['status'] as String? ?? 'active';
                             final locationData = event['locations'];
                             final location = locationData != null ? locationData['name'] as String? : null;
@@ -338,16 +365,75 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
                                     color: statusStyle['iconColor'] as Color?,
                                   ),
                                 ),
-                                title: Text(
-                                  name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                title: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(maxWidth: 200),
+                                          child: Text(
+                                            name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        Chip(
+                                          label: Text(
+                                            translateEventStatus(statusStr),
+                                            style: TextStyle(
+                                              color: statusStyle['iconColor'] as Color?,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          backgroundColor: (statusStyle['color'] as Color?)?.withValues(alpha: 0.6),
+                                          shape: StadiumBorder(
+                                            side: BorderSide(
+                                              color: (statusStyle['iconColor'] as Color?)?.withValues(alpha: 0.4) ?? Colors.transparent,
+                                            ),
+                                          ),
+                                        ),
+                                        PopupMenuButton<String>(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                                          onSelected: (value) async {
+                                            if (value == 'edit') {
+                                              await Navigator.pushNamed(
+                                                context,
+                                                '/edit-event',
+                                                arguments: eventId,
+                                              );
+                                              _loadMyEvents();
+                                            } else if (value == 'delete') {
+                                              _showDeleteDialog(eventId, name);
+                                            }
+                                          },
+                                          itemBuilder: (context) => const [
+                                            PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('Editar'),
+                                            ),
+                                            PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text('Eliminar'),
+                                            ),
+                                          ],
+                                          child: const Icon(Icons.more_vert, size: 20),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     Text(
-                                      _formatDateTime(dateTime),
+                                      _formatDateTime(eventDate, eventTime),
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                     if (location != null) ...[
@@ -359,37 +445,6 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      translateEventStatus(statusStr),
-                                      style: TextStyle(
-                                        color: statusStyle['iconColor'] as Color?,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') {
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/edit-event',
-                                        arguments: eventId,
-                                      );
-                                    } else if (value == 'delete') {
-                                      _showDeleteDialog(eventId, name);
-                                    }
-                                  },
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Editar'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Eliminar'),
-                                    ),
                                   ],
                                 ),
                               ),

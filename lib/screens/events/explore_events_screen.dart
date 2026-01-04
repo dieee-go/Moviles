@@ -58,8 +58,8 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
 
       // Cargar todos los eventos (incluye intereses para filtrar localmente)
       final data = await supabase.from('events').select(
-        'id, name, image_url, event_datetime, created_at, location_id, locations(name), event_interests(interest_id)',
-      ).order('event_datetime', ascending: false);
+        'id, name, image_url, event_date, event_time, created_at, location_id, locations(name), event_interests(interest_id)',
+      ).order('event_date', ascending: false);
 
       setState(() {
         _allEvents = List<Map<String, dynamic>>.from(data);
@@ -77,34 +77,29 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
     }
   }
 
-  String _formatDateTime(String? isoDate) {
-    if (isoDate == null) return '';
+  String _formatDateTime(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return '';
     try {
-      final dt = DateTime.parse(isoDate).toLocal();
-      final months = [
-        'Ene',
-        'Feb',
-        'Mar',
-        'Abr',
-        'May',
-        'Jun',
-        'Jul',
-        'Ago',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dic'
-      ];
+      final date = DateTime.parse(dateStr).toLocal();
+      final parts = timeStr.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      final dt = DateTime(date.year, date.month, date.day, hour, minute);
+      const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
       return '${dt.day} de ${months[dt.month - 1]}, ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
     }
   }
 
-  bool _isEventInDateRange(String? eventDateStr) {
-    if (eventDateStr == null) return false;
+  bool _isEventInDateRange(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return false;
     try {
-      final eventDate = DateTime.parse(eventDateStr).toLocal();
+      final date = DateTime.parse(dateStr).toLocal();
+      final parts = timeStr.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      final eventDate = DateTime(date.year, date.month, date.day, hour, minute);
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
@@ -134,9 +129,19 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
     sorted.sort((a, b) {
       switch (_sortNotifier.value) {
         case 'date_asc':
-          final dateA = DateTime.tryParse(a['event_datetime'] as String? ?? '') ?? DateTime(1900);
-          final dateB = DateTime.tryParse(b['event_datetime'] as String? ?? '') ?? DateTime(1900);
-          return dateA.compareTo(dateB);
+          final dateA = DateTime.tryParse(a['event_date'] as String? ?? '') ?? DateTime(1900);
+          final timeA = (a['event_time'] as String? ?? '').split(':');
+          final hourA = timeA.isNotEmpty ? int.tryParse(timeA[0]) ?? 0 : 0;
+          final minA = timeA.length > 1 ? int.tryParse(timeA[1]) ?? 0 : 0;
+          final dateTimeA = DateTime(dateA.year, dateA.month, dateA.day, hourA, minA);
+          
+          final dateB = DateTime.tryParse(b['event_date'] as String? ?? '') ?? DateTime(1900);
+          final timeB = (b['event_time'] as String? ?? '').split(':');
+          final hourB = timeB.isNotEmpty ? int.tryParse(timeB[0]) ?? 0 : 0;
+          final minB = timeB.length > 1 ? int.tryParse(timeB[1]) ?? 0 : 0;
+          final dateTimeB = DateTime(dateB.year, dateB.month, dateB.day, hourB, minB);
+          return dateTimeA.compareTo(dateTimeB);
+          
         case 'name_asc':
           final nameA = (a['name'] as String? ?? '').toLowerCase();
           final nameB = (b['name'] as String? ?? '').toLowerCase();
@@ -147,9 +152,18 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
           return nameB.compareTo(nameA);
         case 'date_desc':
         default:
-          final dateA = DateTime.tryParse(a['event_datetime'] as String? ?? '') ?? DateTime(1900);
-          final dateB = DateTime.tryParse(b['event_datetime'] as String? ?? '') ?? DateTime(1900);
-          return dateB.compareTo(dateA);
+          final dateA = DateTime.tryParse(a['event_date'] as String? ?? '') ?? DateTime(1900);
+          final timeA = (a['event_time'] as String? ?? '').split(':');
+          final hourA = timeA.isNotEmpty ? int.tryParse(timeA[0]) ?? 0 : 0;
+          final minA = timeA.length > 1 ? int.tryParse(timeA[1]) ?? 0 : 0;
+          final dateTimeA = DateTime(dateA.year, dateA.month, dateA.day, hourA, minA);
+          
+          final dateB = DateTime.tryParse(b['event_date'] as String? ?? '') ?? DateTime(1900);
+          final timeB = (b['event_time'] as String? ?? '').split(':');
+          final hourB = timeB.isNotEmpty ? int.tryParse(timeB[0]) ?? 0 : 0;
+          final minB = timeB.length > 1 ? int.tryParse(timeB[1]) ?? 0 : 0;
+          final dateTimeB = DateTime(dateB.year, dateB.month, dateB.day, hourB, minB);
+          return dateTimeB.compareTo(dateTimeA);
       }
     });
     
@@ -318,7 +332,10 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
 
                                     if (selectedDateFilter != 'todos') {
                                       filteredEvents = filteredEvents.where((event) {
-                                        return _isEventInDateRange(event['event_datetime'] as String?);
+                                        return _isEventInDateRange(
+                                          event['event_date'] as String?,
+                                          event['event_time'] as String?,
+                                        );
                                       }).toList();
                                     }
 
@@ -475,7 +492,7 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
   Widget _buildEventCard(BuildContext context, Map<String, dynamic> event) {
     final imageUrl = event['image_url'] as String?;
     final name = event['name'] as String? ?? 'Sin título';
-    final dateTime = _formatDateTime(event['event_datetime'] as String?);
+    final dateTime = _formatDateTime(event['event_date'] as String?, event['event_time'] as String?);
     final locationData = event['locations'];
     final location =
         locationData != null ? locationData['name'] as String? : null;

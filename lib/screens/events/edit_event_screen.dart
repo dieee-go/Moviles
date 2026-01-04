@@ -23,11 +23,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
   DateTime? eventDate;
   TimeOfDay? startTime;
   String? _imageUrl;
+  String? _originalStatus;
   bool _loading = true;
   bool _uploadingImage = false;
 
   List<Map<String, dynamic>> _allCategories = [];
   Set<String> _selectedCategoryIds = {};
+  Set<String> _originalCategoryIds = {};
   bool _loadingCategories = true;
 
   @override
@@ -48,21 +50,33 @@ class _EditEventScreenState extends State<EditEventScreen> {
     try {
       final data = await supabase
           .from('events')
-          .select('id, name, description, image_url, event_datetime')
+          .select('id, name, description, image_url, event_date, event_time, status')
           .eq('id', widget.eventId)
           .single();
 
-      final iso = data['event_datetime'] as String?;
-      DateTime dt = DateTime.now();
-      if (iso != null) {
-        dt = DateTime.parse(iso).toLocal();
+      final dateStr = data['event_date'] as String?;
+      final timeStr = data['event_time'] as String?;
+      
+      if (dateStr != null) {
+        try {
+          final parsedDate = DateTime.parse(dateStr);
+          eventDate = parsedDate;
+        } catch (_) {}
+      }
+      
+      if (timeStr != null) {
+        try {
+          final timeParts = timeStr.split(':');
+          if (timeParts.length >= 2) {
+            startTime = TimeOfDay(hour: int.parse(timeParts[0]), minute: int.parse(timeParts[1]));
+          }
+        } catch (_) {}
       }
 
       titleController.text = data['name'] as String? ?? '';
       descriptionController.text = data['description'] as String? ?? '';
       _imageUrl = data['image_url'] as String?;
-      eventDate = DateTime(dt.year, dt.month, dt.day);
-      startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+      _originalStatus = data['status'] as String?;
 
       // Cargar categorías
       await _loadCategories();
@@ -104,6 +118,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _selectedCategoryIds = (data as List)
             .map((item) => item['interest_id'] as String)
             .toSet();
+        _originalCategoryIds = Set.from(_selectedCategoryIds);
       });
     } catch (e) {
       if (mounted) {
@@ -191,26 +206,48 @@ class _EditEventScreenState extends State<EditEventScreen> {
     ).toUtc();
 
     try {
+      // Verificar si el evento cambió de "done" a "active"
+      String? newStatus;
+      if (_originalStatus == 'done' && dt.isAfter(DateTime.now())) {
+        newStatus = 'active';
+      }
+
       // Actualizar evento
-      await supabase.from('events').update({
+      final updateData = {
         'name': titleController.text.trim(),
         'description': descriptionController.text.trim(),
         'image_url': _imageUrl,
-        'event_datetime': dt.toIso8601String(),
-      }).eq('id', widget.eventId);
+        'event_date': eventDate!.toIso8601String().split('T')[0],
+        'event_time': '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
+      };
+      
+      if (newStatus != null) {
+        updateData['status'] = newStatus;
+      }
 
-      // Actualizar categorías del evento
-      // Primero eliminar las existentes
-      await supabase.from('event_interests').delete().eq('event_id', widget.eventId);
+      await supabase.from('events').update(updateData).eq('id', widget.eventId);
 
-      // Luego insertar las nuevas
-      if (_selectedCategoryIds.isNotEmpty) {
-        final inserts = _selectedCategoryIds.map((catId) => {
+      // Actualizar categorías del evento solo si hay cambios
+      final addedCategories = _selectedCategoryIds.difference(_originalCategoryIds);
+      final removedCategories = _originalCategoryIds.difference(_selectedCategoryIds);
+
+      // Insertar solo las nuevas categorías
+      if (addedCategories.isNotEmpty) {
+        final inserts = addedCategories.map((catId) => {
           'event_id': widget.eventId,
           'interest_id': catId,
         }).toList();
 
         await supabase.from('event_interests').insert(inserts);
+      }
+
+      // Eliminar solo las categorías removidas
+      if (removedCategories.isNotEmpty) {
+        await supabase
+            .from('event_interests')
+            .delete()
+            .eq('event_id', widget.eventId)
+            .inFilter('interest_id', removedCategories.toList());
       }
 
       if (mounted) {

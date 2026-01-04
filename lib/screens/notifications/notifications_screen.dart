@@ -28,6 +28,8 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
       appBar: AppBar(title: Text("Notificaciones")),
       body: ListView.builder(
@@ -37,7 +39,7 @@ class NotificationsScreen extends StatelessWidget {
           return Card(
             margin: EdgeInsets.all(8),
             child: ListTile(
-              leading: Icon(Icons.notifications),
+              leading: Icon(Icons.notifications, color: scheme.primary),
               title: Text(notif["title"]!),
               subtitle: Text(notif["message"]!),
             ),

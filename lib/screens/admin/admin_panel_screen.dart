@@ -139,10 +139,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       if (!_hasMoreEvents) return;
       final from = _pageEvents * _pageSize;
       final to = from + _pageSize - 1;
-      final data = await supabase
+        final data = await supabase
           .from('events')
-          .select('id, name, event_datetime, status')
-          .order('event_datetime', ascending: true)
+          .select('id, name, event_date, event_time, status')
+          .order('event_date', ascending: true)
+          .order('event_time', ascending: true)
           .range(from, to);
       _events.addAll(List<Map<String, dynamic>>.from(data));
       if (data.length < _pageSize) _hasMoreEvents = false;
@@ -173,9 +174,24 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
 
       final eventsUpcomingResp = await supabase
           .from('events')
-          .select('id')
-          .gte('event_datetime', now.toUtc().toIso8601String());
-      _eventsUpcoming = eventsUpcomingResp.length;
+          .select('event_date, event_time');
+
+      int upcoming = 0;
+      for (final ev in eventsUpcomingResp) {
+        final dateStr = ev['event_date'] as String?;
+        final timeStr = ev['event_time'] as String?;
+        if (dateStr == null || timeStr == null) continue;
+        final date = DateTime.tryParse(dateStr);
+        if (date == null) continue;
+        final parts = timeStr.split(':');
+        final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+        final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+        final dt = DateTime(date.year, date.month, date.day, hour, minute).toUtc();
+        if (dt.isAfter(now.toUtc()) || dt.isAtSameMomentAs(now.toUtc())) {
+          upcoming++;
+        }
+      }
+      _eventsUpcoming = upcoming;
     } catch (e) {
       if (mounted) context.showSnackBar('Error cargando reportes: $e', isError: true);
     } finally {
@@ -466,10 +482,17 @@ class _EventsTab extends StatelessWidget {
           final e = data[index];
           final name = e['name'] as String? ?? 'Sin título';
           final status = e['status'] as String? ?? '';
-          final dtIso = e['event_datetime'] as String?;
+          final dateStr = e['event_date'] as String?;
+          final timeStr = e['event_time'] as String?;
           DateTime? dt;
-          if (dtIso != null) {
-            dt = DateTime.tryParse(dtIso)?.toLocal();
+          if (dateStr != null && timeStr != null) {
+            final parts = timeStr.split(':');
+            final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+            final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+            dt = DateTime.tryParse(dateStr);
+            if (dt != null) {
+              dt = DateTime(dt.year, dt.month, dt.day, hour, minute).toLocal();
+            }
           }
           final dateLabel = dt != null
               ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'

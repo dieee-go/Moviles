@@ -46,7 +46,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
           .from('event_registrations')
           .select(
             'event_id, registration_datetime, checked_in_at, '
-            'events(name, event_datetime, image_url, locations(name))',
+            'events(name, event_date, event_time, image_url, locations(name))',
           )
           .eq('user_id', userId)
           .order('registration_datetime', ascending: false);
@@ -57,7 +57,8 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
         return _RegistrationItem(
           eventId: map['event_id'] as String? ?? '',
           name: (event?['name'] as String?)?.trim() ?? 'Evento sin título',
-          eventDate: event?['event_datetime'] as String?,
+          eventDate: event?['event_date'] as String?,
+          eventTime: event?['event_time'] as String?,
           location: (event?['locations']?['name'] as String?)?.trim(),
           imageUrl: event?['image_url'] as String?,
           registrationDate: map['registration_datetime'] as String?,
@@ -108,13 +109,34 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     return list;
   }
 
-  String _formatDate(String? iso) {
+  String _formatEventDate(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return '';
+    try {
+      final parts = timeStr.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      final date = DateTime.parse(dateStr).toLocal();
+      final dt = DateTime(date.year, date.month, date.day, hour, minute);
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      final datePart = '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
+      final hour12 = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      final timePart = '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
+      return '$datePart · $timePart';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _formatDateTimeIso(String? iso) {
     if (iso == null) return '';
     try {
       final dt = DateTime.parse(iso).toLocal();
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       final datePart = '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
-      final timePart = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      final hour12 = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      final timePart = '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
       return '$datePart · $timePart';
     } catch (_) {
       return '';
@@ -246,7 +268,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatDate(item.eventDate),
+                      _formatEventDate(item.eventDate, item.eventTime),
                       style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
                     ),
                     if (item.location?.isNotEmpty == true) ...[
@@ -285,9 +307,13 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Registro: ${_formatDate(item.registrationDate)}',
-                          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                        Expanded(
+                          child: Text(
+                            'Registro: ${_formatDateTimeIso(item.registrationDate)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -315,6 +341,7 @@ class _RegistrationItem {
   final String eventId;
   final String name;
   final String? eventDate;
+  final String? eventTime;
   final String? location;
   final String? imageUrl;
   final String? registrationDate;
@@ -324,18 +351,23 @@ class _RegistrationItem {
     required this.eventId,
     required this.name,
     required this.eventDate,
+    required this.eventTime,
     required this.location,
     required this.imageUrl,
     required this.registrationDate,
     required this.checkedInAt,
   });
 
-  DateTime? get eventDateParsed => _parseDate(eventDate);
+  DateTime? get eventDateParsed => _parseDate(eventDate, eventTime);
 
-  static DateTime? _parseDate(String? iso) {
-    if (iso == null) return null;
+  static DateTime? _parseDate(String? dateStr, String? timeStr) {
+    if (dateStr == null || timeStr == null) return null;
     try {
-      return DateTime.parse(iso).toLocal();
+      final date = DateTime.parse(dateStr).toLocal();
+      final parts = timeStr.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      return DateTime(date.year, date.month, date.day, hour, minute);
     } catch (_) {
       return null;
     }

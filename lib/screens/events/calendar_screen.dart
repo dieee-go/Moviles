@@ -35,10 +35,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<void> _loadEvents() async {
     setState(() => _loading = true);
     try {
-      final data = await supabase
+        final data = await supabase
           .from('events')
-          .select('id, name, event_datetime, location_id, locations(name), image_url')
-          .order('event_datetime');
+          .select('id, name, event_date, event_time, location_id, locations(name), image_url')
+          .order('event_date')
+          .order('event_time');
 
       setState(() {
         _allEvents = List<Map<String, dynamic>>.from(data);
@@ -54,10 +55,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<Map<String, dynamic>> _getEventsForDay(DateTime day) {
     return _allEvents.where((event) {
-      final eventDate = DateTime.parse(event['event_datetime'] as String);
-      return eventDate.year == day.year &&
-          eventDate.month == day.month &&
-          eventDate.day == day.day;
+      final dateStr = event['event_date'] as String?;
+      final timeStr = event['event_time'] as String?;
+      if (dateStr == null || timeStr == null) return false;
+      final date = DateTime.tryParse(dateStr);
+      if (date == null) return false;
+      return date.year == day.year && date.month == day.month && date.day == day.day;
     }).toList();
   }
 
@@ -303,17 +306,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     itemBuilder: (context, index) {
                       final event = selectedDayEvents[index];
                       final eventName = event['name'] as String? ?? 'Sin título';
-                      final eventDateTime =
-                          event['event_datetime'] as String? ?? '';
+                        final eventDateStr = event['event_date'] as String?;
+                        final eventTimeStr = event['event_time'] as String?;
                       final locationData = event['locations'];
                       final location = locationData != null
                           ? locationData['name'] as String?
                           : null;
                       final imageUrl = event['image_url'] as String?;
 
-                      final eventTime = eventDateTime.isNotEmpty
-                          ? DateFormat('HH:mm').format(DateTime.parse(eventDateTime))
-                          : '';
+                      String eventTime = '';
+                      if (eventDateStr != null && eventTimeStr != null) {
+                        final date = DateTime.tryParse(eventDateStr);
+                        if (date != null) {
+                          final parts = eventTimeStr.split(':');
+                          final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+                          final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+                          final dt = DateTime(date.year, date.month, date.day, hour, minute);
+                          eventTime = DateFormat('HH:mm').format(dt);
+                        }
+                      }
 
                       return Card(
                         elevation: 2,

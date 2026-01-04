@@ -1,15 +1,80 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'firebase_options.dart';
 import 'routes.dart';
+import 'services/firebase/firebase_messaging_service.dart';
+import 'services/firebase/local_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: 'https://onaekcyvbrobrolaotcb.supabase.co',
-    anonKey: 'sb_publishable_p1HwYv5_y_3Ncq6UG9_akQ_eta_2837',
-  );
-  runApp(const MyApp());
+  
+  // Inicializar Firebase y Supabase (críticos)
+  await Future.wait([
+    Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ),
+    Supabase.initialize(
+      url: 'https://onaekcyvbrobrolaotcb.supabase.co',
+      anonKey: 'sb_publishable_p1HwYv5_y_3Ncq6UG9_akQ_eta_2837',
+    ),
+  ]);
+  
+  // Inicializar servicios en paralelo (no bloquean el inicio)
+  _initializeServices();
+  
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+/// Inicializa servicios en segundo plano sin bloquear el inicio
+Future<void> _initializeServices() async {
+  try {
+    debugPrint('📱 Inicializando servicios...');
+    
+    // Inicializar notificaciones locales
+    await LocalNotificationService.initialize();
+    debugPrint('✅ Notificaciones locales inicializadas');
+    
+    // Inicializar Firebase Messaging
+    await FirebaseMessagingService().initialize(
+      onMessageCallback: _handleForegroundMessage,
+      onMessageOpenedAppCallback: _handleMessageOpenedApp,
+    );
+    debugPrint('✅ Firebase Messaging inicializado');
+    
+    // Escuchar cambios de autenticación para sincronizar token
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (session != null) {
+        debugPrint('👤 Usuario autenticado, sincronizando token...');
+        FirebaseMessagingService().syncToken();
+      }
+    });
+  } catch (e, stack) {
+    debugPrint('❌ Error inicializando servicios: $e');
+    debugPrint('Stack: $stack');
+  }
+}
+
+/// Handler para mensajes recibidos cuando la app está en foreground
+Future<void> _handleForegroundMessage(RemoteMessage message) async {
+  // Muestra una notificación local visual
+  await LocalNotificationService.showNotification(message);
+  if (kDebugMode) {
+    debugPrint('Notificación mostrada: ${message.notification?.title}');
+  }
+}
+
+/// Handler para cuando se abre la app desde una notificación
+Future<void> _handleMessageOpenedApp(RemoteMessage message) async {
+  // Aquí puedes navegar a una pantalla específica
+  if (kDebugMode) {
+    debugPrint('Mensaje abierto: ${message.notification?.title}');
+  }
 }
 
 /// Instancia global de Supabase para acceso desde toda la aplicación
