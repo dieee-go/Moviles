@@ -7,7 +7,6 @@ import '../../components/avatar.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
 import '../../theme/app_theme_extensions.dart';
-import '../../pages/login_page.dart';
 import '../../pages/settings_page.dart';
 import 'edit_profile_screen.dart';
 
@@ -38,11 +37,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.dark,
-      ),
-    );
+    _updateStatusBarStyle();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -53,6 +48,21 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     _getProfile();
     _loadRoleHistory();
     // No llamar _loadEventStats aquí - se llama después de cargar el perfil
+  }
+
+  void _updateStatusBarStyle() {
+    final brightness = Theme.of(context).brightness;
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarIconBrightness: brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+      ),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateStatusBarStyle();
   }
 
   @override
@@ -194,9 +204,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         if (mounted) context.showSnackBar('Error al cerrar sesión', isError: true);
     } finally {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-        );
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
   }
