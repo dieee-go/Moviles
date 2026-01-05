@@ -24,12 +24,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _updateStatusBarStyle();
+    _loadEventDetail();
+  }
+
+  void _updateStatusBarStyle() {
+    final brightness = Theme.of(context).brightness;
     SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.light,
+      SystemUiOverlayStyle(
+        statusBarIconBrightness: brightness == Brightness.dark ? Brightness.light : Brightness.dark,
       ),
     );
-    _loadEventDetail();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateStatusBarStyle();
   }
 
   Future<void> _loadEventDetail() async {

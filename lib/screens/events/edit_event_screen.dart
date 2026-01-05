@@ -135,11 +135,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
       setState(() => _uploadingImage = true);
 
+      final user = supabase.auth.currentUser;
+      final userPrefix = user != null ? '${user.id}/' : '';
       final fileName = 'event_${widget.eventId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final originalPath = 'events/originals/$fileName';
-      final thumbPath = 'events/thumbs/$fileName';
+      final originalPath = '${userPrefix}originals/$fileName';
+      final thumbPath = '${userPrefix}thumbs/$fileName';
 
-      await supabase.storage.from('events').uploadBinary(
+      await supabase.storage.from('event-images').uploadBinary(
             originalPath,
             await picked.readAsBytes(),
             fileOptions: FileOptions(
@@ -149,16 +151,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           );
 
-      await supabase.storage.from('events').uploadBinary(
+      await supabase.storage.from('event-images').uploadBinary(
             thumbPath,
             await cropped.readAsBytes(),
             fileOptions: const FileOptions(cacheControl: '3600', upsert: true, contentType: 'image/jpeg'),
           );
 
-      final publicUrl = supabase.storage.from('events').getPublicUrl(thumbPath);
+      final thumbUrl = await supabase.storage
+          .from('event-images')
+          .createSignedUrl(thumbPath, 60 * 60 * 24 * 365 * 10);
 
       setState(() {
-        _imageUrl = publicUrl;
+        _imageUrl = thumbUrl;
         _uploadingImage = false;
       });
 

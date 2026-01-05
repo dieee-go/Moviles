@@ -365,66 +365,63 @@ class _MyEventsScreenState extends State<MyEventsScreen> with WidgetsBindingObse
                                     color: statusStyle['iconColor'] as Color?,
                                   ),
                                 ),
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                title: Row(
                                   children: [
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        ConstrainedBox(
-                                          constraints: const BoxConstraints(maxWidth: 200),
-                                          child: Text(
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
                                             name,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(fontWeight: FontWeight.bold),
                                           ),
-                                        ),
-                                        Chip(
-                                          label: Text(
-                                            translateEventStatus(statusStr),
-                                            style: TextStyle(
-                                              color: statusStyle['iconColor'] as Color?,
-                                              fontWeight: FontWeight.bold,
+                                          const SizedBox(height: 4),
+                                          Chip(
+                                            label: Text(
+                                              translateEventStatus(statusStr),
+                                              style: TextStyle(
+                                                color: statusStyle['iconColor'] as Color?,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            backgroundColor: (statusStyle['color'] as Color?)?.withValues(alpha: 0.6),
+                                            shape: StadiumBorder(
+                                              side: BorderSide(
+                                                color: (statusStyle['iconColor'] as Color?)?.withValues(alpha: 0.4) ?? Colors.transparent,
+                                              ),
                                             ),
                                           ),
-                                          backgroundColor: (statusStyle['color'] as Color?)?.withValues(alpha: 0.6),
-                                          shape: StadiumBorder(
-                                            side: BorderSide(
-                                              color: (statusStyle['iconColor'] as Color?)?.withValues(alpha: 0.4) ?? Colors.transparent,
-                                            ),
-                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                                      onSelected: (value) async {
+                                        if (value == 'edit') {
+                                          await Navigator.pushNamed(
+                                            context,
+                                            '/edit-event',
+                                            arguments: eventId,
+                                          );
+                                          _loadMyEvents();
+                                        } else if (value == 'delete') {
+                                          _showDeleteDialog(eventId, name);
+                                        }
+                                      },
+                                      itemBuilder: (context) => const [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('Editar'),
                                         ),
-                                        PopupMenuButton<String>(
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-                                          onSelected: (value) async {
-                                            if (value == 'edit') {
-                                              await Navigator.pushNamed(
-                                                context,
-                                                '/edit-event',
-                                                arguments: eventId,
-                                              );
-                                              _loadMyEvents();
-                                            } else if (value == 'delete') {
-                                              _showDeleteDialog(eventId, name);
-                                            }
-                                          },
-                                          itemBuilder: (context) => const [
-                                            PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('Editar'),
-                                            ),
-                                            PopupMenuItem(
-                                              value: 'delete',
-                                              child: Text('Eliminar'),
-                                            ),
-                                          ],
-                                          child: const Icon(Icons.more_vert, size: 20),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('Eliminar'),
                                         ),
                                       ],
+                                      child: const Icon(Icons.more_vert, size: 20),
                                     ),
                                   ],
                                 ),

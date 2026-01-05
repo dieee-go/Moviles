@@ -32,12 +32,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _updateStatusBarStyle();
+    _loadUserRole();
+  }
+
+  void _updateStatusBarStyle() {
+    final brightness = Theme.of(context).brightness;
     SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.dark,
+      SystemUiOverlayStyle(
+        statusBarIconBrightness: brightness == Brightness.dark ? Brightness.light : Brightness.dark,
       ),
     );
-    _loadUserRole();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateStatusBarStyle();
   }
 
   Future<void> _loadUserRole() async {
