@@ -37,7 +37,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _updateStatusBarStyle();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,

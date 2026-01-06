@@ -308,7 +308,6 @@ BEGIN
       jsonb_build_object(
         'request_id', NEW.id,
         'user_id', NEW.user_id,
-        'requested_role', NEW.requested_role,
         'message', NEW.message,
         'created_at', NEW.created_at,
         'status', NEW.status

@@ -99,33 +99,37 @@ final class FcmTokenProvider
 
 String _$fcmTokenHash() => r'a5f2f0d70c99b6a8b4cbe284a025864d12a4e018';
 
-/// Notifier para gestionar preferencias de notificaciones del usuario
+/// Notifier para gestionar preferencias de notificaciones del usuario (DEPRECADO - usar notification_preferences_provider)
 
-@ProviderFor(NotificationPreferences)
-final notificationPreferencesProvider = NotificationPreferencesProvider._();
+@ProviderFor(NotificationPreferencesLegacy)
+final notificationPreferencesLegacyProvider =
+    NotificationPreferencesLegacyProvider._();
 
-/// Notifier para gestionar preferencias de notificaciones del usuario
-final class NotificationPreferencesProvider
+/// Notifier para gestionar preferencias de notificaciones del usuario (DEPRECADO - usar notification_preferences_provider)
+final class NotificationPreferencesLegacyProvider
     extends
-        $NotifierProvider<NotificationPreferences, NotificationPreference?> {
-  /// Notifier para gestionar preferencias de notificaciones del usuario
-  NotificationPreferencesProvider._()
+        $NotifierProvider<
+          NotificationPreferencesLegacy,
+          NotificationPreference?
+        > {
+  /// Notifier para gestionar preferencias de notificaciones del usuario (DEPRECADO - usar notification_preferences_provider)
+  NotificationPreferencesLegacyProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'notificationPreferencesProvider',
+        name: r'notificationPreferencesLegacyProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$notificationPreferencesHash();
+  String debugGetCreateSourceHash() => _$notificationPreferencesLegacyHash();
 
   @$internal
   @override
-  NotificationPreferences create() => NotificationPreferences();
+  NotificationPreferencesLegacy create() => NotificationPreferencesLegacy();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(NotificationPreference? value) {
@@ -136,12 +140,12 @@ final class NotificationPreferencesProvider
   }
 }
 
-String _$notificationPreferencesHash() =>
-    r'ed8d550c09e69fcc32f87f99056f45fa05fa1310';
+String _$notificationPreferencesLegacyHash() =>
+    r'897c4bd5d712b88f66c1bc9f6427cdb7ba6cc065';
 
-/// Notifier para gestionar preferencias de notificaciones del usuario
+/// Notifier para gestionar preferencias de notificaciones del usuario (DEPRECADO - usar notification_preferences_provider)
 
-abstract class _$NotificationPreferences
+abstract class _$NotificationPreferencesLegacy
     extends $Notifier<NotificationPreference?> {
   NotificationPreference? build();
   @$mustCallSuper

@@ -1,21 +1,23 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../providers/notification_preferences_provider.dart';
 import '../../theme/app_theme_extensions.dart';
 
-class EventDetailScreen extends StatefulWidget {
+class EventDetailScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   const EventDetailScreen({super.key, required this.eventId});
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   Map<String, dynamic>? _event;
   bool _loading = true;
   bool _isRegistered = false;
@@ -24,7 +26,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _updateStatusBarStyle();
     _loadEventDetail();
   }
 
@@ -212,6 +213,71 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } on PostgrestException catch (e) {
       if (mounted) {
         context.showSnackBar('Error: ${e.message}', isError: true);
+      }
+    }
+  }
+
+  void _showNotificationPreferencesDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Preferencias de notificación'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Bloquear todas las notificaciones'),
+              subtitle: const Text('De este evento'),
+              onTap: () => _blockEventNotifications('all'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule_outlined),
+              title: const Text('Bloquear recordatorios'),
+              subtitle: const Text('Solo recordatorios de este evento'),
+              onTap: () => _blockEventNotifications('reminders'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Bloquear actualizaciones'),
+              subtitle: const Text('Solo cambios en este evento'),
+              onTap: () => _blockEventNotifications('updates'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _blockEventNotifications(String blockType) async {
+    final navigator = Navigator.of(context);
+    
+    try {
+      final success = await ref
+          .read(userNotificationPreferencesProvider.notifier)
+          .blockEvent(widget.eventId, blockType);
+
+      if (success && mounted) {
+        navigator.pop(); // Cerrar el dialog
+        final message = switch (blockType) {
+          'all' => 'Se bloquearon todas las notificaciones de este evento',
+          'reminders' => 'Se bloquearon los recordatorios de este evento',
+          'updates' => 'Se bloquearon las actualizaciones de este evento',
+          _ => 'Preferencia actualizada',
+        };
+        context.showSnackBar(message);
+      } else if (mounted) {
+        context.showSnackBar('Error al bloquear notificaciones', isError: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSnackBar('Error: $e', isError: true);
       }
     }
   }
@@ -592,6 +658,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF1976D2),
                               side: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      
+                      // Botón de preferencias de notificaciones
+                      if (_isRegistered) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showNotificationPreferencesDialog(),
+                            icon: const Icon(Icons.notifications_active_outlined),
+                            label: const Text(
+                              'Preferencias de notificación',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: scheme.secondary,
+                              side: BorderSide(color: scheme.secondary, width: 2),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

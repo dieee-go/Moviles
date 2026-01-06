@@ -173,7 +173,7 @@ final class AuthProvider extends $NotifierProvider<Auth, AsyncValue<void>> {
   }
 }
 
-String _$authHash() => r'c0f9dad55109717b29f3394710b75c26928e6433';
+String _$authHash() => r'1d2808691a1988602bbe6e46f2e55e37dff6a36e';
 
 /// Notifier para manejar la autenticación
 

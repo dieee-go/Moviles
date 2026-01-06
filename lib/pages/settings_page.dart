@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
+import '../models/notification_model.dart';
+import '../providers/notification_preferences_provider.dart';
 import '../theme/app_theme_extensions.dart';
 import 'change_password_page.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  bool _eventNotifications = true;
-  bool _reminders = false;
-  bool _appNotifications = true;
+class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _sendingRequest = false;
   bool _loadingRequestStatus = false;
   String? _requestStatus;
   DateTime? _requestUpdatedAt;
   String? _profileRole;
+  String? _userName;
+  String? _userEmail;
+  String? _avatarUrl;
   ThemeMode _themeMode = ThemeMode.light;
 
   @override
@@ -28,6 +31,7 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _loadUserRole();
     _loadRequestStatus();
+    _loadUserInfo();
   }
 
   @override
@@ -56,6 +60,27 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (_) {
       // Silenciar errores de rol
+    }
+  }
+
+  Future<void> _loadUserInfo() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await supabase
+          .from('profiles')
+          .select('nombre, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (data != null && mounted) {
+        setState(() {
+          _userName = data['nombre'] as String?;
+          _avatarUrl = data['avatar_url'] as String?;
+          _userEmail = user.email;
+        });
+      }
+    } catch (_) {
+      // Silenciar errores
     }
   }
 
@@ -351,15 +376,22 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Widget _sectionTitle(String title) {
+  Widget _sectionTitle(String title, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: scheme.primary),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -457,15 +489,35 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appBarColor = isDark ? Colors.white : Colors.black;
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración'),
+        title: Text(
+          'Configuración',
+          style: TextStyle(
+            color: appBarColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: appBarColor,
+        iconTheme: IconThemeData(color: appBarColor),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.zero,
         children: [
-          _sectionTitle('Apariencia'),
+          // Header con perfil del usuario
+          _buildProfileHeader(),
+          const SizedBox(height: 32),
+
+          // Apariencia
+          _sectionTitle('Apariencia', Icons.palette_outlined),
           _sectionCard(
             children: [
               _switchTile(
@@ -476,49 +528,86 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _sectionTitle('Notificaciones'),
-          _sectionCard(
-            children: [
-              _switchTile(
-                icon: Icons.event_available_outlined,
-                title: 'Notificaciones de Eventos',
-                value: _eventNotifications,
-                onChanged: (v) => setState(() => _eventNotifications = v),
-              ),
-              const Divider(height: 1),
-              _switchTile(
-                icon: Icons.alarm_outlined,
-                title: 'Recordatorios',
-                value: _reminders,
-                onChanged: (v) => setState(() => _reminders = v),
-              ),
-              const Divider(height: 1),
-              _switchTile(
-                icon: Icons.notifications_none_outlined,
-                title: 'Notificaciones de la aplicación',
-                value: _appNotifications,
-                onChanged: (v) => setState(() => _appNotifications = v),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _sectionTitle('Cuenta'),
-          _sectionCard(
-            children: [
-              if (_shouldShowStatusTile()) ...[
-                ListTile(
-                  leading: _leadingIcon(Icons.verified_user_outlined),
-                  title: const Text(
-                    'Estado de solicitud de organizador',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          const SizedBox(height: 28),
+
+          // Notificaciones
+          _sectionTitle('Notificaciones', Icons.notifications_outlined),
+          _buildNotificationsSection(),
+          const SizedBox(height: 28),
+
+          // Solicitud de rol (si aplica)
+          if (_profileRole != 'admin' && _profileRole != 'organizer') ...[
+            _sectionTitle('Rol de organizador', Icons.verified_user_outlined),
+            _sectionCard(
+              children: [
+                if (_shouldShowStatusTile())
+                  ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    title: const Text(
+                      'Estado de solicitud',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      _statusSubtitle(),
+                      style: TextStyle(fontSize: 13, color: scheme.secondaryText),
+                    ),
+                    trailing: _statusBadge(),
+                    onTap: _loadRequestStatus,
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Conviértete en organizador',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Crea y gestiona tus propios eventos en la plataforma',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: scheme.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  subtitle: Text(_statusSubtitle()),
-                  trailing: _statusBadge(),
-                  onTap: _loadRequestStatus,
-                ),
                 const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _canRequestOrganizer() ? _requestOrganizerRole : null,
+                      icon: const Icon(Icons.badge_outlined),
+                      label: const Text('Solicitar rol'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: scheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
+            ),
+            const SizedBox(height: 28),
+          ],
+
+          // Cuenta
+          _sectionTitle('Cuenta', Icons.account_circle_outlined),
+          _sectionCard(
+            children: [
               _navigationTile(
                 icon: Icons.lock_reset_outlined,
                 title: 'Cambiar contraseña',
@@ -529,30 +618,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 },
               ),
-              const Divider(height: 1),
-              if (_profileRole != 'admin' && _profileRole != 'organizer') ...[
-                _navigationTile(
-                  icon: Icons.badge_outlined,
-                  title: 'Solicitar rol de organizador',
-                  titleColor: _canRequestOrganizer() ? Colors.black87 : Colors.grey,
-                  onTap: _requestOrganizerRole,
-                ),
-                const Divider(height: 1),
-              ],
-              _navigationTile(
-                icon: Icons.logout,
-                title: 'Cerrar sesión',
-                titleColor: Colors.red,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cerrar sesión desde la pantalla de perfil')),
-                  );
-                },
-              ),
             ],
           ),
-          const SizedBox(height: 12),
-          _sectionTitle('Información'),
+          const SizedBox(height: 28),
+
+          // Información
+          _sectionTitle('Información', Icons.info_outlined),
           _sectionCard(
             children: [
               _navigationTile(
@@ -574,7 +645,380 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
+
+          // Cerrar sesión (separado)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cerrar sesión desde la pantalla de perfil')),
+                );
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Cerrar sesión'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsSection() {
+    final prefsAsync = ref.watch(notificationPreferencesProvider);
+
+    return prefsAsync.when(
+      data: (prefs) {
+        if (prefs == null) {
+          return _sectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Cargando preferencias...',
+                  style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return _sectionCard(
+          children: [
+            // Registros
+            _switchTile(
+              icon: Icons.how_to_reg_outlined,
+              title: 'Confirmación de registro',
+              value: prefs.registrationNotifications,
+              onChanged: (v) => _updatePreference('registration', v, prefs),
+            ),
+            const Divider(height: 1),
+            // Cambios en eventos
+            _switchTile(
+              icon: Icons.edit_outlined,
+              title: 'Cambios en eventos',
+              value: prefs.eventUpdateNotifications,
+              onChanged: (v) => _updatePreference('event_update', v, prefs),
+            ),
+            const Divider(height: 1),
+            // Recordatorios
+            _switchTile(
+              icon: Icons.schedule_outlined,
+              title: 'Recordatorios',
+              value: prefs.reminderNotifications,
+              onChanged: (v) => _updatePreference('reminder', v, prefs),
+            ),
+            // Expandible para tiempo de recordatorio
+            if (prefs.reminderNotifications)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: _buildReminderTimePicker(prefs),
+              ),
+            const Divider(height: 1),
+            // Alertas de organizador
+            _switchTile(
+              icon: Icons.person_add_outlined,
+              title: 'Alertas de organizador',
+              value: prefs.organizerNotifications,
+              onChanged: (v) => _updatePreference('organizer', v, prefs),
+            ),
+            const Divider(height: 1),
+            // Alertas de admin
+            _switchTile(
+              icon: Icons.admin_panel_settings_outlined,
+              title: 'Alertas de administrador',
+              value: prefs.adminNotifications,
+              onChanged: (v) => _updatePreference('admin', v, prefs),
+            ),
+            const Divider(height: 1),
+            // Horario silencioso
+            ListTile(
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.bedtime_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              title: const Text(
+                'Horario silencioso',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                '${prefs.silentHoursStart.hour.toString().padLeft(2, '0')}:${prefs.silentHoursStart.minute.toString().padLeft(2, '0')} - ${prefs.silentHoursEnd.hour.toString().padLeft(2, '0')}:${prefs.silentHoursEnd.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.secondaryText),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showSilentHoursDialog(prefs),
+            ),
+          ],
+        );
+      },
+      loading: () => _sectionCard(
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          ),
+        ],
+      ),
+      error: (error, stack) => _sectionCard(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('Error: $error'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReminderTimePicker(NotificationPreference prefs) {
+    const options = [15, 30, 60, 1440];
+    const labels = ['15 min', '30 min', '1 hora', '1 día'];
+    
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.05),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recordar antes de',
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.secondaryText,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            children: List.generate(
+              options.length,
+              (index) => ChoiceChip(
+                label: Text(labels[index]),
+                selected: prefs.reminderMinutesBefore == options[index],
+                onSelected: (_) => _updateReminderTime(options[index]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSilentHoursDialog(NotificationPreference prefs) {
+    TimeOfDay selectedStart = prefs.silentHoursStart;
+    TimeOfDay selectedEnd = prefs.silentHoursEnd;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('Horario silencioso'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.schedule),
+                title: const Text('Desde'),
+                trailing: Text(
+                  '${selectedStart.hour.toString().padLeft(2, '0')}:${selectedStart.minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onTap: () async {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: selectedStart,
+                  );
+                  if (time != null) {
+                    setStateDialog(() => selectedStart = time);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule),
+                title: const Text('Hasta'),
+                trailing: Text(
+                  '${selectedEnd.hour.toString().padLeft(2, '0')}:${selectedEnd.minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onTap: () async {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: selectedEnd,
+                  );
+                  if (time != null) {
+                    setStateDialog(() => selectedEnd = time);
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .updateSilentHours(selectedStart, selectedEnd);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Horario silencioso actualizado')),
+                );
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updatePreference(
+    String field,
+    bool value,
+    NotificationPreference prefs,
+  ) async {
+    final notifier = ref.read(userNotificationPreferencesProvider.notifier);
+    final success = await notifier.togglePreference(field);
+    
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Preferencia actualizada')),
+      );
+    }
+  }
+
+  Future<void> _updateReminderTime(int minutes) async {
+    final notifier = ref.read(userNotificationPreferencesProvider.notifier);
+    final success = await notifier.updateReminderTime(minutes);
+    
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tiempo de recordatorio actualizado')),
+      );
+    }
+  }
+
+  Widget _buildProfileHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            scheme.primary.withValues(alpha: 0.1),
+            scheme.primary.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar y nombre
+          Row(
+            children: [
+              // Avatar
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.primary.withValues(alpha: 0.2),
+                  border: Border.all(color: scheme.primary, width: 2),
+                ),
+                child: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(
+                            Icons.person,
+                            size: 36,
+                            color: scheme.primary,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.person,
+                        size: 36,
+                        color: scheme.primary,
+                      ),
+              ),
+              const SizedBox(width: 16),
+              // Nombre y rol
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _userName ?? 'Usuario',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _userEmail ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.secondaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _friendlyRole(_profileRole),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

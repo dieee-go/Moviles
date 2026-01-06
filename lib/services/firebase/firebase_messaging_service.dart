@@ -265,6 +265,47 @@ class FirebaseMessagingService {
     }
   }
 
+  /// Suscribirse a topics dinámicamente basado en preferencias del usuario
+  Future<void> manageSubscriptions(NotificationPreference prefs) async {
+    try {
+      // Recordatorios
+      if (prefs.reminderNotifications) {
+        await subscribeToTopic('event_reminders');
+      } else {
+        await unsubscribeFromTopic('event_reminders');
+      }
+
+      // Actualizaciones de eventos
+      if (prefs.eventUpdateNotifications) {
+        await subscribeToTopic('event_updates');
+      } else {
+        await unsubscribeFromTopic('event_updates');
+      }
+
+      // Alertas de organizador
+      if (prefs.organizerNotifications) {
+        await subscribeToTopic('organizer_alerts');
+      } else {
+        await unsubscribeFromTopic('organizer_alerts');
+      }
+
+      // Alertas de admin
+      if (prefs.adminNotifications) {
+        await subscribeToTopic('admin_alerts');
+      } else {
+        await unsubscribeFromTopic('admin_alerts');
+      }
+
+      if (kDebugMode) {
+        developer.log('Suscripciones a topics actualizadas');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        developer.log('Error actualizando suscripciones a topics: $e');
+      }
+    }
+  }
+
   /// Convierte un RemoteMessage a PushNotification
   static PushNotification remoteMessageToNotification(RemoteMessage message) {
     final type = _parseNotificationType(message.data['type'] ?? 'other');

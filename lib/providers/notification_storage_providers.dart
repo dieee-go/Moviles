@@ -14,7 +14,7 @@ final notificationPreferencesLoaderProvider =
         NotificationPreference(
           userId: userId,
           registrationNotifications: true,
-          attendanceNotifications: true,
+          eventUpdateNotifications: true,
           reminderNotifications: true,
           organizerNotifications: true,
           adminNotifications: true,

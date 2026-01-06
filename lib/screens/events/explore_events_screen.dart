@@ -30,6 +30,12 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Acceso seguro a InheritedWidgets aquí si es necesario
+  }
+
+  @override
   void dispose() {
     _selectedCategoryIdNotifier.dispose();
     _searchNotifier.dispose();
@@ -172,261 +178,267 @@ class ExploreEventsScreenState extends State<ExploreEventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _loading
-            ? _buildSkeleton()
-            : Column(
-                children: [
-                  // Barra de búsqueda
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextField(
-                      onChanged: (value) => _searchNotifier.value = value,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar eventos...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Label: Categorías
-                  if (_categories.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Por categoría:',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ),
-                    ),
-                    ValueListenableBuilder<String?>(
-                      valueListenable: _selectedCategoryIdNotifier,
-                      builder: (context, selectedId, _) {
-                        return SizedBox(
-                          height: 50,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _categories.length + 1,
-                            itemBuilder: (context, i) {
-                              if (i == 0) {
-                                return _buildCategoryChip('Todos', null);
-                              }
-                              final cat = _categories[i - 1];
-                              final name = cat['name'] as String? ?? 'Sin nombre';
-                              return _buildCategoryChip(name, cat['id'] as String);
-                            },
+    return Builder(
+      builder: (context) => Scaffold(
+        body: RefreshIndicator(
+          onRefresh: _loadData,
+          child: _loading
+              ? _buildSkeleton()
+              : CustomScrollView(
+                  slivers: [
+                    // Barra de búsqueda - fija en la parte superior
+                    SliverAppBar(
+                      pinned: true,
+                      floating: false,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      elevation: 0,
+                      scrolledUnderElevation: 0,
+                      toolbarHeight: 70,
+                      flexibleSpace: FlexibleSpaceBar(
+                        background: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: TextField(
+                            onChanged: (value) => _searchNotifier.value = value,
+                            decoration: InputDecoration(
+                              hintText: 'Buscar eventos...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Label: Fecha
-                  if (_categories.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Por fecha:',
-                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                       ),
                     ),
-                    ValueListenableBuilder<String>(
-                      valueListenable: _selectedDateFilterNotifier,
-                      builder: (context, selectedFilter, _) {
-                        return SizedBox(
-                          height: 50,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            children: [
-                              _buildDateChip('Todos', 'todos'),
-                              _buildDateChip('Hoy', 'hoy'),
-                              _buildDateChip('Esta semana', 'semana'),
-                              _buildDateChip('Este mes', 'mes'),
-                              _buildDateChip('Próximos 7 días', 'proximo7'),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
 
-                  // Label: Ubicación
-                  if (_locations.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Por ubicación:',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ),
-                    ),
-                    ValueListenableBuilder<String?>(
-                      valueListenable: _selectedLocationIdNotifier,
-                      builder: (context, selectedLocId, _) {
-                        return SizedBox(
-                          height: 50,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _locations.length + 1,
-                            itemBuilder: (context, i) {
-                              if (i == 0) {
-                                return _buildLocationChip('Todas', null);
-                              }
-                              final loc = _locations[i - 1];
-                              final name = loc['name'] as String? ?? 'Sin nombre';
-                              return _buildLocationChip(name, loc['id'] as String);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  Expanded(
-                    child: ValueListenableBuilder<String?>(
-                      valueListenable: _selectedCategoryIdNotifier,
-                      builder: (context, selectedId, child) {
-                        return ValueListenableBuilder<String>(
-                          valueListenable: _searchNotifier,
-                          builder: (context, search, child) {
-                            return ValueListenableBuilder<String>(
-                              valueListenable: _selectedDateFilterNotifier,
-                              builder: (context, selectedDateFilter, child) {
-                                return ValueListenableBuilder<String?>(
-                                  valueListenable: _selectedLocationIdNotifier,
-                                  builder: (context, selectedLocId, child) {
-                                    List<Map<String, dynamic>> filteredEvents = _allEvents;
-
-                                    if (selectedId != null) {
-                                      filteredEvents = filteredEvents.where((event) {
-                                        final interests = event['event_interests'] as List<dynamic>?;
-                                        if (interests == null) return false;
-                                        return interests.any((i) => (i['interest_id'] as String?) == selectedId);
-                                      }).toList();
-                                    }
-
-                                    if (search.isNotEmpty) {
-                                      filteredEvents = filteredEvents.where((event) {
-                                        final name = (event['name'] as String?) ?? '';
-                                        return name.toLowerCase().contains(search.toLowerCase());
-                                      }).toList();
-                                    }
-
-                                    if (selectedDateFilter != 'todos') {
-                                      filteredEvents = filteredEvents.where((event) {
-                                        return _isEventInDateRange(
-                                          event['event_date'] as String?,
-                                          event['event_time'] as String?,
-                                        );
-                                      }).toList();
-                                    }
-
-                                    if (selectedLocId != null) {
-                                      filteredEvents = filteredEvents.where((event) {
-                                        final locId = event['location_id'] as String?;
-                                        return locId == selectedLocId;
-                                      }).toList();
-                                    }
-
-                                    return ValueListenableBuilder<String>(
-                                      valueListenable: _sortNotifier,
-                                      builder: (context, sort, child) {
-                                        final sortedEvents = _applySorting(filteredEvents);
-
-                                        return Column(
-                                          children: [
-                                            // Contador de eventos y botón de ordenamiento
-                                            Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                              child: Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  Text(
-                                                    '${sortedEvents.length} eventos encontrados',
-                                                    style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
-                                                  ),
-                                                  PopupMenuButton<String>(
-                                                    initialValue: sort,
-                                                    onSelected: (v) => _sortNotifier.value = v,
-                                                    itemBuilder: (context) => const [
-                                                      PopupMenuItem(value: 'date_desc', child: Text('Fecha (próximas)')),
-                                                      PopupMenuItem(value: 'date_asc', child: Text('Fecha (lejanas)')),
-                                                      PopupMenuItem(value: 'name_asc', child: Text('Nombre (A-Z)')),
-                                                      PopupMenuItem(value: 'name_desc', child: Text('Nombre (Z-A)')),
-                                                    ],
-                                                    child: const Icon(Icons.sort, size: 20),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 16),
-
-                                            // Lista de eventos
-                                            Expanded(
-                                              child: sortedEvents.isEmpty
-                                                  ? Center(
-                                                      child: Column(
-                                                        mainAxisAlignment: MainAxisAlignment.center,
-                                                        children: [
-                                                          Icon(Icons.search_off,
-                                                              size: 80, color: Theme.of(context).colorScheme.skeletonBackground),
-                                                          const SizedBox(height: 20),
-                                              const Text(
-                                                'No se encontraron eventos',
-                                                style: TextStyle(fontSize: 18, color: Colors.grey),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              const Text(
-                                                'Intenta con otra búsqueda',
-                                                style: TextStyle(color: Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                                      : ListView.builder(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          itemCount: sortedEvents.length,
-                                          itemBuilder: (context, index) {
-                                            final event = sortedEvents[index];
-                                            return _buildEventCard(context, event);
-                                          },
-                                        ),
-                                ),
-                                        ],
-                                      );
-                                      },
-                                    );
-                                  },
+                    // Filtros - se deslizan con el contenido
+                    if (_categories.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              child: Text(
+                                'Por categoría:',
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                            ),
+                            ValueListenableBuilder<String?>(
+                              valueListenable: _selectedCategoryIdNotifier,
+                              builder: (context, selectedId, _) {
+                                return SizedBox(
+                                  height: 50,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    itemCount: _categories.length + 1,
+                                    itemBuilder: (context, i) {
+                                      if (i == 0) {
+                                        return _buildCategoryChip('Todos', null);
+                                      }
+                                      final cat = _categories[i - 1];
+                                      final name = cat['name'] as String? ?? 'Sin nombre';
+                                      return _buildCategoryChip(name, cat['id'] as String);
+                                    },
+                                  ),
                                 );
                               },
-                            );
-                          },
-                        );
-                      },
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              child: Text(
+                                'Por fecha:',
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                            ),
+                            ValueListenableBuilder<String>(
+                              valueListenable: _selectedDateFilterNotifier,
+                              builder: (context, selectedFilter, _) {
+                                return SizedBox(
+                                  height: 50,
+                                  child: ListView(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    children: [
+                                      _buildDateChip('Todos', 'todos'),
+                                      _buildDateChip('Hoy', 'hoy'),
+                                      _buildDateChip('Esta semana', 'semana'),
+                                      _buildDateChip('Este mes', 'mes'),
+                                      _buildDateChip('Próximos 7 días', 'proximo7'),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            if (_locations.isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                child: Text(
+                                  'Por ubicación:',
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ),
+                              ValueListenableBuilder<String?>(
+                                valueListenable: _selectedLocationIdNotifier,
+                                builder: (context, selectedLocId, _) {
+                                  return SizedBox(
+                                    height: 50,
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      itemCount: _locations.length + 1,
+                                      itemBuilder: (context, i) {
+                                        if (i == 0) {
+                                          return _buildLocationChip('Todas', null);
+                                        }
+                                        final loc = _locations[i - 1];
+                                        final name = loc['name'] as String? ?? 'Sin nombre';
+                                        return _buildLocationChip(name, loc['id'] as String);
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                    // Lista de eventos
+                    SliverToBoxAdapter(
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: _selectedCategoryIdNotifier,
+                        builder: (context, selectedId, child) {
+                          return ValueListenableBuilder<String>(
+                            valueListenable: _searchNotifier,
+                            builder: (context, search, child) {
+                              return ValueListenableBuilder<String>(
+                                valueListenable: _selectedDateFilterNotifier,
+                                builder: (context, selectedDateFilter, child) {
+                                  return ValueListenableBuilder<String?>(
+                                    valueListenable: _selectedLocationIdNotifier,
+                                    builder: (context, selectedLocId, child) {
+                                      List<Map<String, dynamic>> filteredEvents = _allEvents;
+
+                                      if (selectedId != null) {
+                                        filteredEvents = filteredEvents.where((event) {
+                                          final interests = event['event_interests'] as List<dynamic>?;
+                                          if (interests == null) return false;
+                                          return interests.any((i) => (i['interest_id'] as String?) == selectedId);
+                                        }).toList();
+                                      }
+
+                                      if (search.isNotEmpty) {
+                                        filteredEvents = filteredEvents.where((event) {
+                                          final name = (event['name'] as String?) ?? '';
+                                          return name.toLowerCase().contains(search.toLowerCase());
+                                        }).toList();
+                                      }
+
+                                      if (selectedDateFilter != 'todos') {
+                                        filteredEvents = filteredEvents.where((event) {
+                                          return _isEventInDateRange(
+                                            event['event_date'] as String?,
+                                            event['event_time'] as String?,
+                                          );
+                                        }).toList();
+                                      }
+
+                                      if (selectedLocId != null) {
+                                        filteredEvents = filteredEvents.where((event) {
+                                          final locId = event['location_id'] as String?;
+                                          return locId == selectedLocId;
+                                        }).toList();
+                                      }
+
+                                      return ValueListenableBuilder<String>(
+                                        valueListenable: _sortNotifier,
+                                        builder: (context, sort, child) {
+                                          final sortedEvents = _applySorting(filteredEvents);
+
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                // Contador de eventos y botón de ordenamiento
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      '${sortedEvents.length} eventos encontrados',
+                                                      style: TextStyle(color: Theme.of(context).colorScheme.secondaryText),
+                                                    ),
+                                                    PopupMenuButton<String>(
+                                                      initialValue: sort,
+                                                      onSelected: (v) => _sortNotifier.value = v,
+                                                      itemBuilder: (context) => const [
+                                                        PopupMenuItem(value: 'date_desc', child: Text('Fecha (próximas)')),
+                                                        PopupMenuItem(value: 'date_asc', child: Text('Fecha (lejanas)')),
+                                                        PopupMenuItem(value: 'name_asc', child: Text('Nombre (A-Z)')),
+                                                        PopupMenuItem(value: 'name_desc', child: Text('Nombre (Z-A)')),
+                                                      ],
+                                                      child: const Icon(Icons.sort, size: 20),
+                                                    ),
+                                                  ],
+                                                ),
+
+                                                const SizedBox(height: 16),
+
+                                                // Lista de eventos o mensaje vacío
+                                                if (sortedEvents.isEmpty)
+                                                  SizedBox(
+                                                    height: 300,
+                                                    child: Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Icon(Icons.search_off,
+                                                            size: 80, color: Theme.of(context).colorScheme.skeletonBackground),
+                                                        const SizedBox(height: 20),
+                                                        const Text(
+                                                          'No se encontraron eventos',
+                                                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                                                        ),
+                                                        const SizedBox(height: 10),
+                                                        const Text(
+                                                          'Intenta con otra búsqueda',
+                                                          style: TextStyle(color: Colors.grey),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  )
+                                                else
+                                                  ListView.builder(
+                                                    shrinkWrap: true,
+                                                    physics: const NeverScrollableScrollPhysics(),
+                                                    itemCount: sortedEvents.length,
+                                                    itemBuilder: (context, index) {
+                                                      final event = sortedEvents[index];
+                                                      return _buildEventCard(context, event);
+                                                    },
+                                                  ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
       ),
+    ),
     );
   }
 

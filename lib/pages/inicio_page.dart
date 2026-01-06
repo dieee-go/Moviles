@@ -103,16 +103,34 @@ class _InicioPageState extends State<InicioPage> {
   List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> source, String? categoryId) {
     final byCategory = _filterByCategoryLocal(source, categoryId);
     
-    // Exclude registered events
-    final notRegistered = byCategory.where((event) {
+    // Exclude registered events, cancelled events, and past events
+    final filtered = byCategory.where((event) {
       final eventId = event['id'] as String?;
-      return eventId == null || !_registeredEventIds.contains(eventId);
+      
+      // Exclude if already registered
+      if (eventId != null && _registeredEventIds.contains(eventId)) {
+        return false;
+      }
+      
+      // Exclude if cancelled
+      final status = event['status'] as String?;
+      if (status?.toLowerCase() == 'cancelled') {
+        return false;
+      }
+      
+      // Exclude if event has already passed
+      final eventDateTime = _eventDateTime(event);
+      if (eventDateTime != null && eventDateTime.isBefore(DateTime.now())) {
+        return false;
+      }
+      
+      return true;
     }).toList();
     
-    if (_searchTerm.isEmpty) return notRegistered;
+    if (_searchTerm.isEmpty) return filtered;
 
     final query = _searchTerm.toLowerCase();
-    return notRegistered.where((event) {
+    return filtered.where((event) {
       final name = (event['name'] as String?) ?? '';
       final locationName = (event['locations']?['name'] as String?) ?? '';
       return name.toLowerCase().contains(query) || locationName.toLowerCase().contains(query);
@@ -136,9 +154,9 @@ class _InicioPageState extends State<InicioPage> {
     filtered.sort((a, b) {
       final da = _eventDateTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = _eventDateTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return db.compareTo(da);
+      return da.compareTo(db);
     });
-    return filtered.take(3).toList();
+    return filtered.take(5).toList();
   }
 
   List<Map<String, dynamic>> _sortedPopular(List<Map<String, dynamic>> source, String? categoryId) {
