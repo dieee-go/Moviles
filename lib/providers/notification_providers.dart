@@ -17,9 +17,9 @@ Future<String?> fcmToken(Ref ref) async {
   return service.getToken();
 }
 
-/// Notifier para gestionar preferencias de notificaciones del usuario
+/// Notifier para gestionar preferencias de notificaciones del usuario (DEPRECADO - usar notification_preferences_provider)
 @riverpod
-class NotificationPreferences extends _$NotificationPreferences {
+class NotificationPreferencesLegacy extends _$NotificationPreferencesLegacy {
   @override
   NotificationPreference? build() => null;
 
@@ -35,8 +35,8 @@ class NotificationPreferences extends _$NotificationPreferences {
     final updated = switch (preferenceKey) {
       'registrations' =>
         state!.copyWith(registrationNotifications: !state!.registrationNotifications),
-      'attendance' =>
-        state!.copyWith(attendanceNotifications: !state!.attendanceNotifications),
+      'event_update' =>
+        state!.copyWith(eventUpdateNotifications: !state!.eventUpdateNotifications),
       'reminders' =>
         state!.copyWith(reminderNotifications: !state!.reminderNotifications),
       'organizer' =>

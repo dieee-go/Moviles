@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _updateStatusBarStyle();
     _loadUserRole();
   }
 
@@ -48,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _updateStatusBarStyle();
     _updateStatusBarStyle();
   }
 

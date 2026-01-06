@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
@@ -12,6 +13,9 @@ import 'services/firebase/local_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar SharedPreferences para persistencia
+  await SharedPreferences.getInstance();
   
   // Inicializar Firebase y Supabase (críticos)
   await Future.wait([
@@ -111,6 +115,26 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('themeMode') ?? 'light';
+    setState(() {
+      _themeMode = saved == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('themeMode', mode == ThemeMode.dark ? 'dark' : 'light');
+    setState(() => _themeMode = mode);
+  }
 
   ThemeData _buildLightTheme() {
     const seed = Color(0xFF1976D2);
@@ -216,10 +240,6 @@ class _MyAppState extends State<MyApp> {
         contentTextStyle: TextStyle(color: scheme.onInverseSurface),
       ),
     );
-  }
-
-  void _setThemeMode(ThemeMode mode) {
-    setState(() => _themeMode = mode);
   }
 
   @override

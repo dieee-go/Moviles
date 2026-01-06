@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/notification_model.dart';
-import '../providers/notification_providers.dart';
+import '../providers/notification_preferences_provider.dart';
 
 class NotificationPreferencesWidget extends ConsumerWidget {
   final String userId;
@@ -14,93 +14,101 @@ class NotificationPreferencesWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preferences = ref.watch(notificationPreferencesProvider);
+    final preferencesAsync = ref.watch(notificationPreferencesProvider);
 
-    if (preferences == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return preferencesAsync.when(
+      data: (preferences) {
+        if (preferences == null) {
+          return const Center(child: Text('No preferences found'));
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Preferencias de Notificaciones',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Preferencias de Notificaciones',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildToggleTile(
+                ref,
+                context,
+                'Confirmación de Registros',
+                'Notificaciones cuando confirmas tu asistencia',
+                preferences.registrationNotifications,
+                () => ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .togglePreference('registration'),
+              ),
+              const Divider(),
+              _buildToggleTile(
+                ref,
+                context,
+                'Cambios en Eventos',
+                'Notificaciones cuando hay cambios en eventos registrados',
+                preferences.eventUpdateNotifications,
+                () => ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .togglePreference('event_update'),
+              ),
+              const Divider(),
+              _buildToggleTile(
+                ref,
+                context,
+                'Recordatorios de Eventos',
+                'Recordatorios antes de eventos que se avecinan',
+                preferences.reminderNotifications,
+                () => ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .togglePreference('reminder'),
+              ),
+              if (preferences.reminderNotifications)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: _buildReminderTimePicker(ref, preferences),
+                ),
+              const Divider(),
+              _buildToggleTile(
+                ref,
+                context,
+                'Alertas de Organizador',
+                'Notificaciones cuando alguien se registra en tus eventos',
+                preferences.organizerNotifications,
+                () => ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .togglePreference('organizer'),
+              ),
+              const Divider(),
+              _buildToggleTile(
+                ref,
+                context,
+                'Solicitudes de Administrador',
+                'Notificaciones de solicitudes de rol de organizador',
+                preferences.adminNotifications,
+                () => ref
+                    .read(userNotificationPreferencesProvider.notifier)
+                    .togglePreference('admin'),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _showSaveSuccess(context),
+                  child: const Text('Guardar Preferencias'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          _buildToggleTile(
-            ref,
-            context,
-            'Confirmación de Registros',
-            'Notificaciones cuando confirmas tu asistencia',
-            preferences.registrationNotifications,
-            () => ref
-                .read(notificationPreferencesProvider.notifier)
-                .togglePreference('registrations'),
-          ),
-          const Divider(),
-          _buildToggleTile(
-            ref,
-            context,
-            'Confirmación de Asistencia',
-            'Notificaciones cuando asistes a un evento',
-            preferences.attendanceNotifications,
-            () => ref
-                .read(notificationPreferencesProvider.notifier)
-                .togglePreference('attendance'),
-          ),
-          const Divider(),
-          _buildToggleTile(
-            ref,
-            context,
-            'Recordatorios de Eventos',
-            'Recordatorios antes de eventos que se avecinan',
-            preferences.reminderNotifications,
-            () => ref
-                .read(notificationPreferencesProvider.notifier)
-                .togglePreference('reminders'),
-          ),
-          if (preferences.reminderNotifications)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: _buildReminderTimePicker(ref, preferences),
-            ),
-          const Divider(),
-          _buildToggleTile(
-            ref,
-            context,
-            'Alertas de Organizador',
-            'Notificaciones cuando alguien se registra en tus eventos',
-            preferences.organizerNotifications,
-            () => ref
-                .read(notificationPreferencesProvider.notifier)
-                .togglePreference('organizer'),
-          ),
-          const Divider(),
-          _buildToggleTile(
-            ref,
-            context,
-            'Solicitudes de Administrador',
-            'Notificaciones de solicitudes de rol de organizador',
-            preferences.adminNotifications,
-            () => ref
-                .read(notificationPreferencesProvider.notifier)
-                .togglePreference('admin'),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => _showSaveSuccess(context),
-              child: const Text('Guardar Preferencias'),
-            ),
-          ),
-        ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error cargando preferencias: $error'),
       ),
     );
   }
@@ -154,8 +162,8 @@ class NotificationPreferencesWidget extends ConsumerWidget {
                 selected: preferences.reminderMinutesBefore == options[index],
                 onSelected: (_) {
                   ref
-                      .read(notificationPreferencesProvider.notifier)
-                      .setReminderTime(options[index]);
+                      .read(userNotificationPreferencesProvider.notifier)
+                      .updateReminderTime(options[index]);
                 },
               ),
             ),

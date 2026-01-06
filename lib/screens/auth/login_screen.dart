@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
+import '../../services/notification_supabase_service.dart';
+import '../../services/firebase/firebase_messaging_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final session = data.session;
         if (session != null) {
           _redirecting = true;
+          _syncNotificationPreferences(session.user.id);
           if (mounted) {
             Navigator.of(context).pushReplacementNamed('/home');
           }
@@ -95,6 +99,19 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _syncNotificationPreferences(String userId) async {
+    try {
+      final prefs = await NotificationSupabaseService.getPreferences(userId);
+      if (prefs != null) {
+        await FirebaseMessagingService().manageSubscriptions(prefs);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error sincronizando preferencias: $e');
       }
     }
   }
