@@ -18,6 +18,7 @@ import 'screens/profile/profile_page.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/admin/admin_panel_screen.dart';
+import 'screens/admin/admin_guard.dart';
 
 final Map<String, WidgetBuilder> appRoutes = {
   '/welcome': (context) => const WelcomeScreen(),
@@ -34,7 +35,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/profile': (context) => const ProfilePage(),
   '/edit-profile': (context) => EditProfileScreen(),
   '/notifications': (context) => NotificationsScreen(),
-  '/admin': (context) => AdminPanelScreen(),
+  '/admin': (context) => AdminGuard(child: AdminPanelScreen()),
   '/event-detail': (context) {
     final args = ModalRoute.of(context)?.settings.arguments as String?;
     if (args == null) {
