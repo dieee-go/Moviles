@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
 import 'routes.dart';
+import 'components/connectivity_banner.dart';
 import 'services/firebase/firebase_messaging_service.dart';
 import 'services/firebase/local_notification_service.dart';
 
@@ -247,14 +248,28 @@ class _MyAppState extends State<MyApp> {
     return ThemeController(
       themeMode: _themeMode,
       setThemeMode: _setThemeMode,
-      child: MaterialApp(
-        title: 'UniEventos',
-        theme: _buildLightTheme(),
-        darkTheme: _buildDarkTheme(),
-        themeMode: _themeMode,
-        debugShowCheckedModeBanner: false,
-        initialRoute: supabase.auth.currentSession == null ? '/welcome' : '/home',
-        routes: appRoutes,
+      child: ProviderScope(
+        child: Builder(
+          builder: (context) {
+            return MaterialApp(
+              title: 'UniEventos',
+              theme: _buildLightTheme(),
+              darkTheme: _buildDarkTheme(),
+              themeMode: _themeMode,
+              debugShowCheckedModeBanner: false,
+              initialRoute: supabase.auth.currentSession == null ? '/welcome' : '/home',
+              routes: appRoutes,
+              builder: (context, child) {
+                return Column(
+                  children: [
+                    const ConnectivityBanner(),
+                    Expanded(child: child ?? const SizedBox.shrink()),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
