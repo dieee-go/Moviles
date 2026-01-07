@@ -93,7 +93,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       if (data.length < _pageSize) _hasMoreUsers = false;
       _pageUsers++;
     } catch (e) {
-      if (mounted) context.showSnackBar('Error cargando usuarios: $e', isError: true);
+      _showSnackBar('Error cargando usuarios: $e', isError: true);
     } finally {
       if (mounted) setState(() => _loadingUsers = false);
     }
@@ -121,7 +121,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       if (data.length < _pageSize) _hasMoreOrganizers = false;
       _pageOrganizers++;
     } catch (e) {
-      if (mounted) context.showSnackBar('Error cargando organizadores: $e', isError: true);
+      _showSnackBar('Error cargando organizadores: $e', isError: true);
     } finally {
       if (mounted) setState(() => _loadingOrganizers = false);
     }
@@ -149,7 +149,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       if (data.length < _pageSize) _hasMoreEvents = false;
       _pageEvents++;
     } catch (e) {
-      if (mounted) context.showSnackBar('Error cargando eventos: $e', isError: true);
+      _showSnackBar('Error cargando eventos: $e', isError: true);
     } finally {
       if (mounted) setState(() => _loadingEvents = false);
     }
@@ -193,7 +193,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       }
       _eventsUpcoming = upcoming;
     } catch (e) {
-      if (mounted) context.showSnackBar('Error cargando reportes: $e', isError: true);
+      _showSnackBar('Error cargando reportes: $e', isError: true);
     } finally {
       if (mounted) setState(() => _loadingReports = false);
     }
@@ -230,7 +230,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             : newRole == 'organizer' 
               ? 'Organizador' 
               : 'Estudiante';
-        context.showSnackBar('Rol actualizado a $roleLabel');
+        _showSnackBar('Rol actualizado a $roleLabel');
       }
       
       await Future.wait([
@@ -253,6 +253,238 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       ),
       builder: (context) {
         return _RequestsSheet(onApproved: _loadEvents);
+      },
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    final bg = isError ? Theme.of(context).colorScheme.error : null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: bg),
+      );
+    });
+  }
+
+  Future<void> _deleteEvent(String eventId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar evento'),
+        content: const Text('¿Estás seguro de que deseas eliminar este evento? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await supabase.from('events').delete().eq('id', eventId);
+      _showSnackBar('Evento eliminado');
+      await _loadEvents(reset: true);
+    } on PostgrestException catch (e) {
+      _showSnackBar('Error: ${e.message}', isError: true);
+    } catch (e) {
+      _showSnackBar('Error eliminando evento', isError: true);
+    }
+  }
+
+  Future<void> _deleteUser(String userId) async {
+    final current = supabase.auth.currentUser?.id;
+    if (userId == current) {
+      if (mounted) context.showSnackBar('No puedes eliminar tu propia cuenta', isError: true);
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar usuario'),
+        content: const Text('¿Seguro que deseas eliminar este usuario? Esto removerá su perfil.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await supabase.from('profiles').delete().eq('id', userId);
+      _showSnackBar('Usuario eliminado');
+      await _loadUsers(reset: true);
+    } on PostgrestException catch (e) {
+      _showSnackBar('Error: ${e.message}', isError: true);
+    } catch (e) {
+      _showSnackBar('Error eliminando usuario', isError: true);
+    }
+  }
+
+  Future<void> _showEditEventDialog(String eventId) async {
+    // Capture synchronous context-dependent objects to avoid using context after async gaps
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final theme = Theme.of(context);
+    final errorColor = theme.colorScheme.error;
+
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    DateTime? eventDate;
+    TimeOfDay? startTime;
+    String status = 'active';
+    bool loading = true;
+
+    // Load event data
+    try {
+      final data = await supabase
+          .from('events')
+          .select('id, name, description, event_date, event_time, status')
+          .eq('id', eventId)
+          .maybeSingle();
+      if (data != null) {
+        titleController.text = data['name'] as String? ?? '';
+        descriptionController.text = data['description'] as String? ?? '';
+        final dateStr = data['event_date'] as String?;
+        final timeStr = data['event_time'] as String?;
+        if (dateStr != null) {
+          try {
+            eventDate = DateTime.parse(dateStr);
+          } catch (_) {}
+        }
+        if (timeStr != null) {
+          try {
+            final parts = timeStr.split(':');
+            if (parts.length >= 2) startTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+          } catch (_) {}
+        }
+        status = (data['status'] as String?) ?? 'active';
+      }
+    } catch (e) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando evento: $e'), backgroundColor: errorColor));
+      });
+      return;
+    } finally {
+      loading = false;
+    }
+
+    await showDialog<bool>(
+      // ignore: use_build_context_synchronously
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: eventDate ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2035),
+              );
+              if (picked != null) setStateDialog(() => eventDate = picked);
+            }
+
+            Future<void> pickTime() async {
+              final picked = await showTimePicker(context: context, initialTime: startTime ?? const TimeOfDay(hour: 18, minute: 0));
+              if (picked != null) setStateDialog(() => startTime = picked);
+            }
+
+            return AlertDialog(
+              title: const Text('Editar evento'),
+              content: loading
+                  ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
+                  : SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Título')),
+                          const SizedBox(height: 8),
+                          TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Descripción'), maxLines: 3),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: pickDate,
+                                  icon: const Icon(Icons.calendar_today),
+                                  label: Text(eventDate == null ? 'Seleccionar fecha' : '${eventDate!.day}/${eventDate!.month}/${eventDate!.year}'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: pickTime,
+                                  icon: const Icon(Icons.access_time),
+                                  label: Text(startTime == null ? 'Seleccionar hora' : '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            initialValue: status,
+                            items: const [
+                              DropdownMenuItem(value: 'active', child: Text('Activo')),
+                              DropdownMenuItem(value: 'done', child: Text('Finalizado')),
+                              DropdownMenuItem(value: 'cancelled', child: Text('Cancelado')),
+                            ],
+                            onChanged: (v) => setStateDialog(() => status = v ?? 'active'),
+                            decoration: const InputDecoration(labelText: 'Estado'),
+                          ),
+                        ],
+                      ),
+                    ),
+              actions: [
+                TextButton(onPressed: () => navigator.pop(false), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (titleController.text.trim().isEmpty) {
+                      messenger.showSnackBar(const SnackBar(content: Text('El título no puede estar vacío')));
+                      return;
+                    }
+
+                    if (eventDate == null || startTime == null) {
+                      messenger.showSnackBar(const SnackBar(content: Text('Selecciona fecha y hora')));
+                      return;
+                    }
+
+                    final dateStr = eventDate!.toIso8601String().split('T')[0];
+                    final timeStr = '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00';
+
+                    try {
+                      await supabase.from('events').update({
+                        'name': titleController.text.trim(),
+                        'description': descriptionController.text.trim(),
+                        'event_date': dateStr,
+                        'event_time': timeStr,
+                        'status': status,
+                      }).eq('id', eventId);
+
+                      if (!mounted) return;
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Evento actualizado')));
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop(true);
+                    } on PostgrestException catch (e) {
+                      if (!mounted) return;
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.message}'), backgroundColor: errorColor));
+                    } catch (e) {
+                      if (!mounted) return;
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando evento'), backgroundColor: errorColor));
+                    }
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
@@ -290,6 +522,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             onLoadMore: () => _loadUsers(),
             onRefresh: () => _loadUsers(reset: true),
             onChangeRole: _changeRole,
+            onDeleteUser: _deleteUser,
           ),
           _UsersTab(
             data: _organizers,
@@ -298,6 +531,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             onLoadMore: () => _loadOrganizers(),
             onRefresh: () => _loadOrganizers(reset: true),
             onChangeRole: (id, _) => _changeRole(id, 'student'),
+            onDeleteUser: _deleteUser,
             titleOverride: 'Organizadores',
             showDemote: true,
             header: Align(
@@ -315,6 +549,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             hasMore: _hasMoreEvents,
             onLoadMore: () => _loadEvents(),
             onRefresh: () => _loadEvents(reset: true),
+            onDelete: _deleteEvent,
+            onEdit: (id) async {
+              await _showEditEventDialog(id);
+              await _loadEvents(reset: true);
+            },
+            onViewAttendees: (id) => Navigator.of(context).pushNamed('/attendees', arguments: id),
           ),
           _ReportsTab(
             loading: _loadingReports,
@@ -336,6 +576,7 @@ class _UsersTab extends StatelessWidget {
   final Future<void> Function() onLoadMore;
   final Future<void> Function() onRefresh;
   final Future<void> Function(String userId, String newRole) onChangeRole;
+  final Future<void> Function(String userId)? onDeleteUser;
   final String? titleOverride;
   final bool showDemote;
   final Widget? header;
@@ -347,6 +588,7 @@ class _UsersTab extends StatelessWidget {
     required this.onLoadMore,
     required this.onRefresh,
     required this.onChangeRole,
+    this.onDeleteUser,
     this.titleOverride,
     this.showDemote = false,
     this.header,
@@ -418,13 +660,21 @@ class _UsersTab extends StatelessWidget {
               title: Text(_fullName(u)),
               subtitle: Text(u['email'] as String? ?? ''),
               trailing: PopupMenuButton<String>(
-                onSelected: (value) => onChangeRole(u['id'] as String, value),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    if (onDeleteUser != null) onDeleteUser!(u['id'] as String);
+                  } else {
+                    onChangeRole(u['id'] as String, value);
+                  }
+                },
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'admin', child: Text('Hacer admin')),
                   const PopupMenuItem(value: 'organizer', child: Text('Hacer organizador')),
                   const PopupMenuItem(value: 'student', child: Text('Hacer estudiante')),
                   if (showDemote)
                     const PopupMenuItem(value: 'student', child: Text('Revocar rol')),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(value: 'delete', child: Text('Eliminar usuario', style: TextStyle(color: Colors.red))),
                 ],
                 child: Chip(label: Text(_translateRole(role))),
               ),
@@ -442,6 +692,9 @@ class _EventsTab extends StatelessWidget {
   final bool hasMore;
   final Future<void> Function() onLoadMore;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(String eventId)? onDelete;
+  final void Function(String eventId)? onEdit;
+  final void Function(String eventId)? onViewAttendees;
 
   const _EventsTab({
     required this.data,
@@ -449,6 +702,9 @@ class _EventsTab extends StatelessWidget {
     required this.hasMore,
     required this.onLoadMore,
     required this.onRefresh,
+    this.onDelete,
+    this.onEdit,
+    this.onViewAttendees,
   });
 
   @override
@@ -503,7 +759,23 @@ class _EventsTab extends StatelessWidget {
             child: ListTile(
               title: Text(name),
               subtitle: Text(dateLabel),
-              trailing: Chip(label: Text(_translateStatus(status.isEmpty ? '' : status))),
+              trailing: PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'view') {
+                    if (onViewAttendees != null) onViewAttendees!(e['id'] as String);
+                  } else if (value == 'edit') {
+                    if (onEdit != null) onEdit!(e['id'] as String);
+                  } else if (value == 'delete') {
+                    if (onDelete != null) onDelete!(e['id'] as String);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'view', child: Text('Ver asistentes')),
+                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                  const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: Colors.red))),
+                ],
+                child: Chip(label: Text(_translateStatus(status.isEmpty ? '' : status))),
+              ),
             ),
           );
         },
@@ -612,7 +884,7 @@ class _RequestsSheetState extends State<_RequestsSheet> {
         _requests = List<Map<String, dynamic>>.from(data);
       });
     } catch (e) {
-      if (mounted) context.showSnackBar('Error cargando solicitudes: $e', isError: true);
+      _showSnackBar('Error cargando solicitudes: $e', isError: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -624,13 +896,13 @@ class _RequestsSheetState extends State<_RequestsSheet> {
         'request_id': id,
         'approve': approve,
       });
-      if (mounted) context.showSnackBar(approve ? 'Solicitud aprobada' : 'Solicitud rechazada');
+      _showSnackBar(approve ? 'Solicitud aprobada' : 'Solicitud rechazada', isError: false);
       await _loadRequests();
       await widget.onApproved();
     } on PostgrestException catch (e) {
-      if (mounted) context.showSnackBar('Error: ${e.message}', isError: true);
+      _showSnackBar('Error: ${e.message}', isError: true);
     } catch (e) {
-      if (mounted) context.showSnackBar('Error inesperado', isError: true);
+      _showSnackBar('Error inesperado', isError: true);
     }
   }
   String _name(Map<String, dynamic> r) {
@@ -729,5 +1001,15 @@ class _RequestsSheetState extends State<_RequestsSheet> {
         ),
       ),
     );
+  }
+  
+  void _showSnackBar(String s, {required bool isError}) {
+    final bg = isError ? Theme.of(context).colorScheme.error : null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s), backgroundColor: bg),
+      );
+    });
   }
 }
