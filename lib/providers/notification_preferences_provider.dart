@@ -11,10 +11,23 @@ part 'notification_preferences_provider.g.dart';
 /// Provider para obtener las preferencias de notificación del usuario actual
 @riverpod
 Future<NotificationPreference?> notificationPreferences(Ref ref) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return null;
+  // Intentar obtener el usuario desde el provider generado
+  var user = ref.watch(currentUserProvider);
 
-  return NotificationSupabaseService.getPreferences(user.id);
+  // Si aún no hay usuario, esperar al primer estado de authSession
+  if (user == null) {
+    final authState = await ref.watch(authSessionProvider.future);
+    user = authState.session?.user;
+    if (user == null) return null;
+  }
+
+  // Intentar leer preferencias desde Supabase
+  final prefs = await NotificationSupabaseService.getPreferences(user.id);
+  if (prefs != null) return prefs;
+
+  // Si no existen, crear preferencias por defecto y devolver una instancia
+  await NotificationSupabaseService.createDefaultPreferences(user.id);
+  return NotificationPreference(userId: user.id);
 }
 
 /// Notifier para actualizar preferencias de notificación

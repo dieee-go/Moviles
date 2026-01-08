@@ -12,33 +12,45 @@ class NotificationsScreen extends ConsumerWidget {
     final historyNotifier = ref.read(notificationHistoryListProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
     final unreadCount = historyAsync.maybeWhen(
-      data: (notifications) =>
-          notifications.where((n) => !n.isRead).length,
+      data: (notifications) => notifications.where((n) => !n.isRead).length,
       orElse: () => 0,
     );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appBarColor = isDark ? Colors.white : Colors.black;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notificaciones'),
+        title: Text(
+          'Notificaciones',
+          style: TextStyle(
+            color: appBarColor, 
+            fontWeight: FontWeight.w600),
+        ),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: scheme.surface,
-        foregroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.white
-            : Colors.black,
+        foregroundColor: appBarColor,
+        iconTheme: IconThemeData(color: appBarColor),
         actions: [
           if (unreadCount > 0)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: TextButton(
-                onPressed: () {
-                    ref
-                      .read(notificationHistoryActionsProvider.notifier)
-                      .markAllAsRead();
-                },
-                child: const Text('Marcar todo como leído'),
-              ),
+            IconButton(
+              icon: const Icon(Icons.done_all),
+              tooltip: 'Marcar todo como leído',
+              onPressed: () async {
+                final success = await ref
+                    .read(notificationHistoryActionsProvider.notifier)
+                    .markAllAsRead();
+                if (!context.mounted) return;
+                if (success) {
+                  await historyNotifier.refresh();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Error al marcar notificaciones como leídas')),
+                  );
+                }
+              },
             ),
         ],
       ),
@@ -88,8 +100,12 @@ class NotificationsScreen extends ConsumerWidget {
                 return false;
               },
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                itemCount: notifications.length + (historyNotifier.hasMore ? 1 : 0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                itemCount:
+                    notifications.length + (historyNotifier.hasMore ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index >= notifications.length) {
                     return const Padding(
@@ -98,12 +114,7 @@ class NotificationsScreen extends ConsumerWidget {
                     );
                   }
                   final notif = notifications[index];
-                  return _buildNotificationCard(
-                    context,
-                    notif,
-                    ref,
-                    scheme,
-                  );
+                  return _buildNotificationCard(context, notif, ref, scheme);
                 },
               ),
             );
@@ -113,11 +124,7 @@ class NotificationsScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 48,
-                  color: scheme.error,
-                ),
+                Icon(Icons.error_outline, size: 48, color: scheme.error),
                 const SizedBox(height: 16),
                 Text(
                   'Error al cargar notificaciones',
@@ -174,8 +181,8 @@ class NotificationsScreen extends ConsumerWidget {
         onTap: () {
           if (!notif.isRead) {
             ref
-              .read(notificationHistoryActionsProvider.notifier)
-              .markAsRead(notif.id);
+                .read(notificationHistoryActionsProvider.notifier)
+                .markAsRead(notif.id);
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -244,12 +251,12 @@ class NotificationsScreen extends ConsumerWidget {
                     onSelected: (value) {
                       if (value == 'delete') {
                         ref
-                          .read(notificationHistoryActionsProvider.notifier)
-                          .deleteNotification(notif.id);
+                            .read(notificationHistoryActionsProvider.notifier)
+                            .deleteNotification(notif.id);
                       } else if (value == 'read') {
                         ref
-                          .read(notificationHistoryActionsProvider.notifier)
-                          .markAsRead(notif.id);
+                            .read(notificationHistoryActionsProvider.notifier)
+                            .markAsRead(notif.id);
                       }
                     },
                     itemBuilder: (BuildContext context) => [

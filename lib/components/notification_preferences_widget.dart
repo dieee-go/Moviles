@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/notification_model.dart';
 import '../providers/notification_preferences_provider.dart';
+import '../providers/profile_role_provider.dart';
 
 class NotificationPreferencesWidget extends ConsumerWidget {
   final String userId;
@@ -14,7 +15,8 @@ class NotificationPreferencesWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preferencesAsync = ref.watch(notificationPreferencesProvider);
+    final preferencesAsync = ref.watch(userNotificationPreferencesProvider);
+    final roleAsync = ref.watch(profileRoleProvider);
 
     return preferencesAsync.when(
       data: (preferences) {
@@ -72,27 +74,44 @@ class NotificationPreferencesWidget extends ConsumerWidget {
                   padding: const EdgeInsets.only(top: 16),
                   child: _buildReminderTimePicker(ref, preferences),
                 ),
-              const Divider(),
-              _buildToggleTile(
-                ref,
-                context,
-                'Alertas de Organizador',
-                'Notificaciones cuando alguien se registra en tus eventos',
-                preferences.organizerNotifications,
-                () => ref
-                    .read(userNotificationPreferencesProvider.notifier)
-                    .togglePreference('organizer'),
-              ),
-              const Divider(),
-              _buildToggleTile(
-                ref,
-                context,
-                'Solicitudes de Administrador',
-                'Notificaciones de solicitudes de rol de organizador',
-                preferences.adminNotifications,
-                () => ref
-                    .read(userNotificationPreferencesProvider.notifier)
-                    .togglePreference('admin'),
+              // Mostrar tiles condicionalmente según el rol usando provider reutilizable
+              roleAsync.when(
+                data: (role) {
+                  final List<Widget> widgets = [];
+                  if (role == 'organizer') {
+                    widgets.addAll([
+                      const Divider(),
+                      _buildToggleTile(
+                        ref,
+                        context,
+                        'Alertas de Organizador',
+                        'Notificaciones cuando alguien se registra en tus eventos',
+                        preferences.organizerNotifications,
+                        () => ref
+                            .read(userNotificationPreferencesProvider.notifier)
+                            .togglePreference('organizer'),
+                      ),
+                    ]);
+                  }
+                  if (role == 'admin') {
+                    widgets.addAll([
+                      const Divider(),
+                      _buildToggleTile(
+                        ref,
+                        context,
+                        'Solicitudes de Administrador',
+                        'Notificaciones de solicitudes de rol de organizador',
+                        preferences.adminNotifications,
+                        () => ref
+                            .read(userNotificationPreferencesProvider.notifier)
+                            .togglePreference('admin'),
+                      ),
+                    ]);
+                  }
+                  return Column(children: widgets);
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (error, stack) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 24),
               SizedBox(

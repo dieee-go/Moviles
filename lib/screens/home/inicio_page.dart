@@ -21,6 +21,7 @@ class _InicioPageState extends State<InicioPage> {
   String _searchTerm = '';
   final ValueNotifier<String?> _selectedCategoryIdNotifier = ValueNotifier<String?>(null);
   bool _loading = true;
+  static const int _cardsCount = 5;
 
   @override
   void initState() {
@@ -47,32 +48,50 @@ class _InicioPageState extends State<InicioPage> {
       final events = await supabase
           .from('events')
           .select(
-            'id, name, image_url, created_at, event_date, event_time, location_id, locations(name), event_interests(interest_id), registrations_count:event_registrations(count)',
+            'id, name, image_url, created_at, event_date, event_time, status, location_id, locations(name), event_interests(interest_id), registrations_count:event_registrations(count)',
           )
           .order('event_date', ascending: false)
           .order('event_time', ascending: false);
 
       _allEvents = List<Map<String, dynamic>>.from(events);
 
+      if (kDebugMode) {
+        debugPrint('Loaded ${_allEvents.length} events');
+      }
+
       // Load current user's interests and registered events
       final userId = supabase.auth.currentUser?.id;
       if (userId != null) {
         final userInterstList = await supabase
-            .from('user_interests')
-            .select('interest_id')
-            .eq('user_id', userId);
+          .from('user_interests')
+          .select('interest_id')
+          .eq('user_id', userId);
         _userInterests = (userInterstList as List)
-            .map((item) => item['interest_id'] as String)
-            .toList();
+          .map((item) => (item['interest_id']?.toString() ?? ''))
+          .where((s) => s.isNotEmpty)
+          .toList();
 
         // Load user's registered events
         final registeredEvents = await supabase
-            .from('event_registrations')
-            .select('event_id')
-            .eq('user_id', userId);
+          .from('event_registrations')
+          .select('event_id')
+          .eq('user_id', userId);
         _registeredEventIds = (registeredEvents as List)
-            .map((item) => item['event_id'] as String)
-            .toList();
+          .map((item) => (item['event_id']?.toString() ?? ''))
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+        if (kDebugMode) {
+          debugPrint('User interests: ${_userInterests.toString()}');
+          debugPrint('Registered event ids: ${_registeredEventIds.toString()}');
+          // Print first 5 events' interests for inspection
+          for (var i = 0; i < (_allEvents.length < 5 ? _allEvents.length : 5); i++) {
+            final ev = _allEvents[i];
+            final evId = ev['id']?.toString() ?? '<no-id>';
+            final evInterests = ev['event_interests'];
+            debugPrint('Event $i id=$evId interests=$evInterests');
+          }
+        }
       }
     } on PostgrestException catch (e) {
       if (mounted) {
@@ -96,7 +115,7 @@ class _InicioPageState extends State<InicioPage> {
     return source.where((event) {
       final interests = event['event_interests'] as List<dynamic>?;
       if (interests == null) return false;
-      return interests.any((i) => (i['interest_id'] as String?) == categoryId);
+      return interests.any((i) => (i['interest_id']?.toString()) == categoryId);
     }).toList();
   }
 
@@ -137,6 +156,37 @@ class _InicioPageState extends State<InicioPage> {
     }).toList();
   }
 
+  // Similar to _applyFilters but DOES NOT exclude already-registered events.
+  List<Map<String, dynamic>> _applyFiltersForRecommendations(List<Map<String, dynamic>> source, String? categoryId) {
+    final byCategory = _filterByCategoryLocal(source, categoryId);
+
+    // Do not exclude registered events here; only exclude cancelled and past events
+    final filtered = byCategory.where((event) {
+      // Exclude if cancelled
+      final status = event['status'] as String?;
+      if (status?.toLowerCase() == 'cancelled') {
+        return false;
+      }
+
+      // Exclude if event has already passed
+      final eventDateTime = _eventDateTime(event);
+      if (eventDateTime != null && eventDateTime.isBefore(DateTime.now())) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    if (_searchTerm.isEmpty) return filtered;
+
+    final query = _searchTerm.toLowerCase();
+    return filtered.where((event) {
+      final name = (event['name'] as String?) ?? '';
+      final locationName = (event['locations']?['name'] as String?) ?? '';
+      return name.toLowerCase().contains(query) || locationName.toLowerCase().contains(query);
+    }).toList();
+  }
+
   DateTime? _eventDateTime(Map<String, dynamic> event) {
     final dateStr = event['event_date'] as String?;
     final timeStr = event['event_time'] as String?;
@@ -156,7 +206,7 @@ class _InicioPageState extends State<InicioPage> {
       final db = _eventDateTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
       return da.compareTo(db);
     });
-    return filtered.take(5).toList();
+    return filtered.take(_cardsCount).toList();
   }
 
   List<Map<String, dynamic>> _sortedPopular(List<Map<String, dynamic>> source, String? categoryId) {
@@ -196,14 +246,14 @@ class _InicioPageState extends State<InicioPage> {
       final createdB = DateTime.tryParse((b['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
       return createdA.compareTo(createdB);
     });
-    return filtered.take(5).toList();
+    return filtered.take(_cardsCount).toList();
   }
 
   int _countMatchingInterests(Map<String, dynamic> event) {
     final eventInterests = event['event_interests'] as List<dynamic>? ?? [];
     int matchCount = 0;
     for (var interest in eventInterests) {
-      final interestId = interest['interest_id'] as String?;
+      final interestId = interest['interest_id']?.toString();
       if (interestId != null && _userInterests.contains(interestId)) {
         matchCount++;
       }
@@ -212,12 +262,17 @@ class _InicioPageState extends State<InicioPage> {
   }
 
   List<Map<String, dynamic>> _sortedRecommended(List<Map<String, dynamic>> source, String? categoryId) {
-    final filtered = _applyFilters(source, categoryId);
+    final filtered = _applyFiltersForRecommendations(source, categoryId);
     
     // Filter to only events with at least one matching interest
     final withMatchingInterests = filtered.where((event) {
       return _countMatchingInterests(event) > 0;
     }).toList();
+
+    if (kDebugMode) {
+      debugPrint('filtered events after applyFilters: ${filtered.length}');
+      debugPrint('withMatchingInterests (before sort): ${withMatchingInterests.length}');
+    }
 
     withMatchingInterests.sort((a, b) {
       // 1. Sort by number of matching interests (descending - most matches first)
@@ -233,7 +288,7 @@ class _InicioPageState extends State<InicioPage> {
       return eventA.compareTo(eventB);
     });
     
-    return withMatchingInterests.take(5).toList();
+    return withMatchingInterests.take(_cardsCount).toList();
   }
 
   String _formatDateTime(String? dateStr, String? timeStr) {
@@ -536,6 +591,8 @@ class _InicioPageState extends State<InicioPage> {
     final imageUrl = event['image_url'] as String?;
     final name = event['name'] as String? ?? 'Sin título';
     final dateTime = _formatDateTime(event['event_date'] as String?, event['event_time'] as String?);
+    final eventId = event['id']?.toString();
+    final isRegistered = eventId != null && _registeredEventIds.contains(eventId);
 
     return Container(
       width: 300,
@@ -608,19 +665,21 @@ class _InicioPageState extends State<InicioPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        final id = event['id'];
-                        if (id != null) {
-                          Navigator.pushNamed(context, '/event-detail', arguments: id.toString());
-                        }
-                      },
+                      onPressed: isRegistered
+                          ? null
+                          : () {
+                              final id = event['id'];
+                              if (id != null) {
+                                Navigator.pushNamed(context, '/event-detail', arguments: id.toString());
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: const Text('Registrarse', style: TextStyle(fontSize: 13)),
+                      child: Text(isRegistered ? 'Registrado' : 'Registrarse', style: const TextStyle(fontSize: 13)),
                     ),
                   ),
                 ],
@@ -665,6 +724,9 @@ class _InicioPageState extends State<InicioPage> {
     final dateTime = _formatDateTime(event['event_date'] as String?, event['event_time'] as String?);
     final locationData = event['locations'];
     final location = locationData != null ? locationData['name'] as String? : null;
+    final scheme = Theme.of(context).colorScheme;
+    final eventId = event['id']?.toString();
+    final isRegistered = eventId != null && _registeredEventIds.contains(eventId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -740,6 +802,10 @@ class _InicioPageState extends State<InicioPage> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
+              ],
+              if (isRegistered) ...[
+                const SizedBox(height: 4),
+                Text('Ya registrado', style: TextStyle(fontSize: 12, color: scheme.primary, fontWeight: FontWeight.w600)),
               ],
             ],
           ),

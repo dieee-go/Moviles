@@ -149,6 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 12),
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.tertiary,
+            ),
             onPressed: () {
               Navigator.of(context).pushNamed('/forgot');
             },
@@ -156,6 +159,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 4),
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.tertiary,
+            ),
             onPressed: () {
               Navigator.of(context).pushNamed('/register');
             },

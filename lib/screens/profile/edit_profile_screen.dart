@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
+import '../../services/interests_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -29,6 +30,7 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
   
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
+  final _interestsService = InterestsService();
   
   bool _loading = true;
   bool _saving = false;
@@ -132,14 +134,15 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
           .order('name');
       _allInterests = List<Map<String, dynamic>>.from(interests);
       
-      // Load user's selected interests
-      final userInterests = await supabase
+        // Load user's selected interests
+        final userInterests = await supabase
           .from('user_interests')
           .select('interest_id')
           .eq('user_id', userId);
-      
-      _selectedInterestIds = (userInterests as List)
-          .map((item) => item['interest_id'] as String)
+
+        _selectedInterestIds = (userInterests as List)
+          .map((item) => (item['interest_id']?.toString() ?? ''))
+          .where((s) => s.isNotEmpty)
           .toSet();
       
       debugPrint('Loaded ${_allInterests.length} total interests');
@@ -168,31 +171,8 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
         'email': _emailCtrl.text.trim(),
       }).eq('id', userId);
 
-      // Upsert interests (insert if not exists, ignore if already exists)
-      // This is more efficient than delete + insert
-      if (_selectedInterestIds.isNotEmpty) {
-        final interestsToUpsert = _selectedInterestIds
-            .map((interestId) => {
-                  'user_id': userId,
-                  'interest_id': interestId,
-                })
-            .toList();
-        
-        debugPrint('Upserting ${interestsToUpsert.length} interests');
-        await supabase
-            .from('user_interests')
-            .upsert(
-              interestsToUpsert,
-              onConflict: 'user_id,interest_id',
-            );
-        debugPrint('Successfully upserted interests');
-      } else {
-        // Delete all interests if none selected
-        await supabase
-            .from('user_interests')
-            .delete()
-            .eq('user_id', userId);
-      }
+      // Save interests using service (handles upsert and deletions)
+      await _interestsService.saveUserInterests(userId, _selectedInterestIds.toList());
 
       // Handle carrera for students
       if (_userRole == 'student') {
@@ -545,12 +525,15 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
       );
     }
     
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _allInterests.map((interest) {
-        final id = interest['id'] as String;
-        final name = interest['name'] as String;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _allInterests.map((interest) {
+        final id = (interest['id']?.toString() ?? '');
+        final name = (interest['name']?.toString() ?? '');
         final isSelected = _selectedInterestIds.contains(id);
         
         return FilterChip(
@@ -559,7 +542,11 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
           onSelected: (selected) {
             setState(() {
               if (selected) {
-                _selectedInterestIds.add(id);
+                if (_selectedInterestIds.length < 3) {
+                  _selectedInterestIds.add(id);
+                } else {
+                  if (mounted) context.showSnackBar('Máximo 3 intereses permitidos');
+                }
               } else {
                 _selectedInterestIds.remove(id);
               }
@@ -576,6 +563,16 @@ class EditProfileScreenState extends State<EditProfileScreen> with TickerProvide
           ),
         );
       }).toList(),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4.0),
+          child: Text(
+            '${_selectedInterestIds.length}/3 seleccionados',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+          ),
+        ),
+      ],
     );
   }
 
