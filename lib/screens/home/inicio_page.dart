@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../main.dart';
+import '../../providers/connectivity_provider.dart';
 import '../../theme/app_theme_extensions.dart';
 
-class InicioPage extends StatefulWidget {
+class InicioPage extends ConsumerStatefulWidget {
   const InicioPage({super.key});
 
   @override
-  State<InicioPage> createState() => _InicioPageState();
-}
+  ConsumerState<InicioPage> createState() => _InicioPageState();
+} 
 
-class _InicioPageState extends State<InicioPage> {
+class _InicioPageState extends ConsumerState<InicioPage> {
   final TextEditingController _searchCtrl = TextEditingController();
-  List<Map<String, dynamic>> _allEvents = [];
+  List<Map<String, dynamic>> _allEvents = []; 
   List<Map<String, dynamic>> _categories = [];
   List<String> _userInterests = [];
   List<String> _registeredEventIds = [];
@@ -27,6 +29,13 @@ class _InicioPageState extends State<InicioPage> {
   void initState() {
     super.initState();
     _loadData();
+
+    // Escucha cambios de conectividad y recarga cuando se reconecta
+    ref.listen<bool>(connectivityProvider, (prev, next) {
+      if (prev == false && next == true) {
+        if (mounted) _loadData();
+      }
+    });
   }
 
   @override
@@ -306,152 +315,194 @@ class _InicioPageState extends State<InicioPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: scheme.alternativeSurface,
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _loading
-            ? _buildLoadingSkeleton()
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final connected = ref.watch(connectivityProvider);
+
+    Widget content;
+    if (_loading) {
+      content = _buildLoadingSkeleton();
+    } else if (!connected) {
+      content = _buildOfflineBody();
+    } else {
+      content = SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Buscar eventos...',
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  suffixIcon: _searchTerm.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _searchTerm = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() => _searchTerm = value.trim());
+                },
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              ),
+            ),
+            ValueListenableBuilder<String?>(
+              valueListenable: _selectedCategoryIdNotifier,
+              builder: (context, categoryId, _) {
+                final featured = _sortedFeatured(_allEvents, categoryId);
+                if (featured.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        controller: _searchCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar eventos...',
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                          suffixIcon: _searchTerm.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, color: Colors.grey),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    setState(() => _searchTerm = '');
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onChanged: (value) {
-                          setState(() => _searchTerm = value.trim());
-                        },
-                        onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                    SizedBox(
+                      height: 270,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: featured.length,
+                        itemBuilder: (context, i) => _buildFeaturedCard(featured[i]),
                       ),
                     ),
-                    ValueListenableBuilder<String?>(
-                      valueListenable: _selectedCategoryIdNotifier,
-                      builder: (context, categoryId, _) {
-                        final featured = _sortedFeatured(_allEvents, categoryId);
-                        if (featured.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return Column(
-                          children: [
-                            SizedBox(
-                              height: 270,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: featured.length,
-                                itemBuilder: (context, i) => _buildFeaturedCard(featured[i]),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-                        );
-                      },
+                    const SizedBox(height: 24),
+                  ],
+                );
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Categorías',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ValueListenableBuilder<String?>(
+              valueListenable: _selectedCategoryIdNotifier,
+              builder: (context, categoryId, _) {
+                final popular = _sortedPopular(_allEvents, categoryId);
+                final recommended = _sortedRecommended(_allEvents, categoryId);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 42,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _categories.length + 1,
+                        itemBuilder: (context, i) {
+                          if (i == 0) {
+                            return _buildCategoryChip('Todos', null);
+                          }
+                          final cat = _categories[i - 1];
+                          return _buildCategoryChip(_categoryLabel(cat), cat['id'] as String);
+                        },
+                      ),
                     ),
+                    const SizedBox(height: 24),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'Categorías',
+                        'Eventos Populares',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ValueListenableBuilder<String?>(
-                      valueListenable: _selectedCategoryIdNotifier,
-                      builder: (context, categoryId, _) {
-                        final popular = _sortedPopular(_allEvents, categoryId);
-                        final recommended = _sortedRecommended(_allEvents, categoryId);
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              height: 42,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: _categories.length + 1,
-                                itemBuilder: (context, i) {
-                                  if (i == 0) {
-                                    return _buildCategoryChip('Todos', null);
-                                  }
-                                  final cat = _categories[i - 1];
-                                  return _buildCategoryChip(_categoryLabel(cat), cat['id'] as String);
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Eventos Populares',
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (popular.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
-                              )
-                            else
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: popular.length,
-                                itemBuilder: (context, i) => _buildEventListTile(popular[i]),
-                              ),
-                            const SizedBox(height: 24),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Recomendados para ti',
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (recommended.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
-                              )
-                            else
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: recommended.length,
-                                itemBuilder: (context, i) => _buildEventListTile(recommended[i]),
-                              ),
-                            const SizedBox(height: 24),
-                          ],
-                        );
-                      },
+                    if (popular.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: popular.length,
+                        itemBuilder: (context, i) => _buildEventListTile(popular[i]),
+                      ),
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Recomendados para ti',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
                     ),
+                    const SizedBox(height: 12),
+                    if (recommended.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('No hay eventos disponibles', style: TextStyle(color: Colors.grey)),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: recommended.length,
+                        itemBuilder: (context, i) => _buildEventListTile(recommended[i]),
+                      ),
+                    const SizedBox(height: 24),
                   ],
-                ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: scheme.alternativeSurface,
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: content,
+      ),
+    );
+  }
+
+  Widget _buildOfflineBody() {
+    final scheme = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Card(
+            color: scheme.surfaceContainerHighest,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.wifi_off, size: 48, color: scheme.error),
+                  const SizedBox(height: 12),
+                  const Text('Sin conexión a Internet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const Text('Comprueba tu conexión y vuelve a intentarlo.', textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ),
       ),
     );
   }
