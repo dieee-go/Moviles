@@ -44,6 +44,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  Future<void> _signOut() async {
+    try {
+      await supabase.auth.signOut();
+    } on AuthException catch (e) {
+      if (mounted) context.showSnackBar(e.message, isError: true);
+    } catch (e) {
+        if (mounted) context.showSnackBar('Error al cerrar sesión', isError: true);
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
+  }
+
   Future<void> _loadUserRole() async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -651,11 +665,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cerrar sesión desde la pantalla de perfil')),
-                );
-              },
+              onPressed: _signOut,
               icon: const Icon(Icons.logout),
               label: const Text('Cerrar sesión'),
               style: ElevatedButton.styleFrom(
@@ -675,7 +685,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildNotificationsSection() {
-    final prefsAsync = ref.watch(notificationPreferencesProvider);
+    final prefsAsync = ref.watch(userNotificationPreferencesProvider);
 
     return prefsAsync.when(
       data: (prefs) {
@@ -725,22 +735,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: _buildReminderTimePicker(prefs),
               ),
             const Divider(height: 1),
-            // Alertas de organizador
-            _switchTile(
-              icon: Icons.person_add_outlined,
-              title: 'Alertas de organizador',
-              value: prefs.organizerNotifications,
-              onChanged: (v) => _updatePreference('organizer', v, prefs),
-            ),
-            const Divider(height: 1),
-            // Alertas de admin
-            _switchTile(
-              icon: Icons.admin_panel_settings_outlined,
-              title: 'Alertas de administrador',
-              value: prefs.adminNotifications,
-              onChanged: (v) => _updatePreference('admin', v, prefs),
-            ),
-            const Divider(height: 1),
+            // Alertas de organizador (solo para organizadores)
+            if (_profileRole == 'organizer') ...[
+              _switchTile(
+                icon: Icons.person_add_outlined,
+                title: 'Alertas de organizador',
+                value: prefs.organizerNotifications,
+                onChanged: (v) => _updatePreference('organizer', v, prefs),
+              ),
+              const Divider(height: 1),
+            ],
+
+            // Alertas de admin (solo para administradores)
+            if (_profileRole == 'admin') ...[
+              _switchTile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'Alertas de administrador',
+                value: prefs.adminNotifications,
+                onChanged: (v) => _updatePreference('admin', v, prefs),
+              ),
+              const Divider(height: 1),
+            ],
             // Horario silencioso
             ListTile(
               leading: Container(

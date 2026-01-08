@@ -6,8 +6,10 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -25,29 +27,29 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                const Text(
+                Text(
                   'Bienvenido a',
-                  style: TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 20,
-                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'UniEventos',
-                  style: TextStyle(
-                    fontSize: 36,
+                  style: textTheme.displaySmall?.copyWith(
+                    color: colorScheme.tertiary,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1976D2),
+                    fontSize: 36,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Tu plataforma de eventos universitarios',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha:0.7),
                     fontSize: 16,
-                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -58,17 +60,9 @@ class WelcomeScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.pushNamed(context, '/login');
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1976D2),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: const Text(
+                    child: Text(
                       'Iniciar Sesión',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 16),
                     ),
                   ),
                 ),
@@ -81,15 +75,15 @@ class WelcomeScreen extends StatelessWidget {
                       Navigator.pushNamed(context, '/register');
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF1976D2),
-                      side: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                      foregroundColor: colorScheme.primary,
+                      side: BorderSide(color: colorScheme.primary, width: 2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Registrarse',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 16),
                     ),
                   ),
                 ),

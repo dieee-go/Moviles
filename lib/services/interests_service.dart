@@ -38,13 +38,18 @@ class InterestsService {
     }
   }
 
-  /// Guarda los intereses seleccionados para un usuario
-  Future<void> saveUserInterests(
+  /// Experimental: try to perform upsert + selective delete using PostgREST 'in' filter.
+  /// This mirrors the previous approach but may be fragile due to PostgREST quoting
+  /// rules for UUIDs; kept for testing. Prefer `saveUserInterests` (delete+insert).
+  Future<void> saveUserInterestsUsingIn(
     String userId,
     List<String> selectedInterestIds,
   ) async {
     try {
-      if (selectedInterestIds.isEmpty) return;
+      if (selectedInterestIds.isEmpty) {
+        await _supabase.from('user_interests').delete().eq('user_id', userId);
+        return;
+      }
 
       final rows = selectedInterestIds
           .map((id) => {
@@ -53,9 +58,56 @@ class InterestsService {
               })
           .toList();
 
+      // Upsert selected
       await _supabase
           .from('user_interests')
           .upsert(rows, onConflict: 'user_id,interest_id');
+
+      // Build an 'in' list using double quotes around UUIDs: ("uuid1","uuid2")
+      final inList = '(${selectedInterestIds.map((s) => '"${s.replaceAll('"', '\\"')}"').join(',')})';
+
+      // Delete any interests not in the selected set (for this user)
+      await _supabase
+          .from('user_interests')
+          .delete()
+          .eq('user_id', userId)
+          .not('interest_id', 'in', inList);
+    } on PostgrestException catch (e) {
+      throw Exception('Error guardando intereses (using in): ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado guardando intereses (using in): $e');
+    }
+  }
+
+  /// Guarda los intereses seleccionados para un usuario
+  Future<void> saveUserInterests(
+    String userId,
+    List<String> selectedInterestIds,
+  ) async {
+    try {
+      // If nothing selected, remove all interests for the user
+      if (selectedInterestIds.isEmpty) {
+        await _supabase.from('user_interests').delete().eq('user_id', userId);
+        return;
+      }
+
+      final rows = selectedInterestIds
+          .map((id) => {
+                'user_id': userId,
+                'interest_id': id,
+              })
+          .toList();
+
+      // Simpler, robust approach: delete all current interests for the user
+      // and insert the selected ones. This avoids complex 'not in' filtering
+      // that can lead to malformed input when passing UUID values through
+      // PostgREST filters.
+      await _supabase.from('user_interests').delete().eq('user_id', userId);
+
+      // Insert selected interests (if any)
+      if (rows.isNotEmpty) {
+        await _supabase.from('user_interests').insert(rows);
+      }
     } on PostgrestException catch (e) {
       throw Exception('Error guardando intereses: ${e.message}');
     } catch (e) {

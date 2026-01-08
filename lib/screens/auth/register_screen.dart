@@ -335,6 +335,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 );
               }).toList(),
             ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+              child: Text(
+                '${_interesesSeleccionados.values.where((v) => v).length}/3 seleccionados',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _isLoading ? null : _signUp,

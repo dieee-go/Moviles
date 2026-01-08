@@ -45,7 +45,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         context.showSnackBar(
           'Se envió un enlace de recuperación a tu correo',
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pushNamedAndRemoveUntil('/password-check-email', (route) => false);
       }
     } on AuthException catch (error) {
       if (mounted) {

@@ -56,9 +56,8 @@ Future<void> _initializeServices() async {
       final session = data.session;
       final event = data.event;
       if (event == AuthChangeEvent.passwordRecovery) {
-        // Navegar a la pantalla de cambio de contraseña
-        // Usar navigatorKey para acceder al contexto global
-        navigatorKey.currentState?.pushNamed('/reset-password');
+        recoveryMode = true;
+        navigatorKey.currentState?.pushNamedAndRemoveUntil('/reset-password', (route) => false);
         debugPrint('🔑 Evento PASSWORD_RECOVERY detectado, navegando a reset-password');
       } else if (session != null) {
         debugPrint('👤 Usuario autenticado, sincronizando token...');
@@ -121,6 +120,7 @@ class MyApp extends StatefulWidget {
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+bool recoveryMode = false;
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
@@ -197,8 +197,14 @@ class _MyAppState extends State<MyApp> {
   }
 
   ThemeData _buildDarkTheme() {
-    const seed = Color(0xFF1976D2);
-    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+    const seed = Color.fromARGB(255, 13, 57, 101);
+    final baseScheme = ColorScheme.fromSeed(
+      seedColor: seed, 
+      brightness: Brightness.dark
+    ); 
+    final scheme = baseScheme.copyWith(
+      primary: const Color.fromARGB(255, 82, 150, 207),
+    );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -231,8 +237,9 @@ class _MyAppState extends State<MyApp> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: scheme.primary, width: 2),
+          borderSide: BorderSide(color: scheme.tertiary, width: 2),
         ),
+        floatingLabelStyle: TextStyle(color: scheme.tertiary),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
@@ -266,7 +273,11 @@ class _MyAppState extends State<MyApp> {
               darkTheme: _buildDarkTheme(),
               themeMode: _themeMode,
               debugShowCheckedModeBanner: false,
-              initialRoute: supabase.auth.currentSession == null ? '/welcome' : '/home',
+              initialRoute: recoveryMode
+                  ? '/reset-password'
+                  : (supabase.auth.currentSession == null
+                        ? '/welcome'
+                        : '/home'),
               routes: appRoutes,
               builder: (context, child) {
                 return Column(

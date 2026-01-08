@@ -57,16 +57,18 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Contraseña actualizada'),
             content: const Text('Tu contraseña fue cambiada exitosamente. Inicia sesión nuevamente.'),
             actions: [
               TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                onPressed: () async {
+                  // close the dialog using the dialog's context, then navigate
+                  Navigator.of(dialogContext).pop();
+                  await supabase.auth.signOut();
+                  if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
                 },
-                child: const Text('Ir a login'),
+                child: const Text('Ir a inicio de sesión'),
               ),
             ],
           ),
@@ -131,11 +133,14 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   }
 
   Widget _buildRequirementRow(String text, bool isMet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final successColor = Colors.green;
+    final defaultColor = colorScheme.onSurface.withValues(alpha: 0.6 * 255);
     return Row(
       children: [
         Icon(
           isMet ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: isMet ? Colors.green : Colors.grey,
+          color: isMet ? successColor : defaultColor,
           size: 18,
         ),
         const SizedBox(width: 8),
@@ -143,7 +148,7 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
           text,
           style: TextStyle(
             fontSize: 13,
-            color: isMet ? Colors.green : Colors.grey,
+            color: isMet ? successColor : defaultColor,
           ),
         ),
       ],

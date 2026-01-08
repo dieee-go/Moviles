@@ -5,6 +5,7 @@ import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/new_password_page.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/auth/check_email_screen.dart';
+import 'screens/auth/password_check_email_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/home/inicio_page.dart';
 import 'screens/events/explore_events_screen.dart';
@@ -24,6 +25,7 @@ import 'screens/admin/admin_guard.dart';
 final Map<String, WidgetBuilder> appRoutes = {
   '/welcome': (context) => const WelcomeScreen(),
   '/check-email': (context) => const CheckEmailScreen(),
+  '/password-check-email': (context) => const PassCheckEmailScreen(),
   '/login': (context) => const LoginScreen(),
   '/register': (context) => const RegisterScreen(),
   '/forgot': (context) => const ForgotPasswordScreen(),
