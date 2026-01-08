@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../main.dart';
-import '../components/event_image_uploader.dart';
+import '../../main.dart';
+import '../../components/event_image_uploader.dart';
 
 class CreateEventPage extends StatefulWidget {
   const CreateEventPage({super.key});

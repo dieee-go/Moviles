@@ -153,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         },
         emailRedirectTo: kIsWeb
             ? null
-            : 'com.example.unieventos://login-callback/',
+            : 'unieventos://login-callback/',
       );
 
       final user = response.user;

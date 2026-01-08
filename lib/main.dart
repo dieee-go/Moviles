@@ -54,7 +54,13 @@ Future<void> _initializeServices() async {
     // Escuchar cambios de autenticación para sincronizar token
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
-      if (session != null) {
+      final event = data.event;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        // Navegar a la pantalla de cambio de contraseña
+        // Usar navigatorKey para acceder al contexto global
+        navigatorKey.currentState?.pushNamed('/reset-password');
+        debugPrint('🔑 Evento PASSWORD_RECOVERY detectado, navegando a reset-password');
+      } else if (session != null) {
         debugPrint('👤 Usuario autenticado, sincronizando token...');
         FirebaseMessagingService().syncToken();
       }
@@ -113,6 +119,8 @@ class MyApp extends StatefulWidget {
   @override
   State<MyApp> createState() => _MyAppState();
 }
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
@@ -252,6 +260,7 @@ class _MyAppState extends State<MyApp> {
         child: Builder(
           builder: (context) {
             return MaterialApp(
+              navigatorKey: navigatorKey,
               title: 'UniEventos',
               theme: _buildLightTheme(),
               darkTheme: _buildDarkTheme(),

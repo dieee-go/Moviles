@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../main.dart';
-import '../theme/app_theme_extensions.dart';
+import '../../main.dart';
+import '../../theme/app_theme_extensions.dart';
 
 class InicioPage extends StatefulWidget {
   const InicioPage({super.key});
