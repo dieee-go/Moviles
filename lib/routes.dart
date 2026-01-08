@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/new_password_page.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/auth/check_email_screen.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/home/inicio_screen.dart';
+import 'screens/home/inicio_page.dart';
 import 'screens/events/explore_events_screen.dart';
-import 'screens/events/create_event_service.dart';
+import 'screens/events/create_event_page.dart';
 import 'screens/events/event_detail_screen.dart';
 import 'screens/events/my_events_screen.dart';
 import 'screens/events/attendance_screen.dart';
@@ -26,10 +27,11 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/login': (context) => const LoginScreen(),
   '/register': (context) => const RegisterScreen(),
   '/forgot': (context) => const ForgotPasswordScreen(),
+  '/reset-password': (context) => const NewPasswordPage(),
   '/home': (context) => const HomeScreen(),
-  '/inicio': (context) => InicioScreen(),
+  '/inicio': (context) => const InicioPage(),
   '/explore': (context) => ExploreEventsScreen(),
-  '/create-event': (context) => CreateEventScreen(),
+  '/create-event': (context) => const CreateEventPage(),
   '/my-events': (context) => MyEventsScreen(),
   '/calendar': (context) => const CalendarScreen(),
   '/profile': (context) => const ProfilePage(),

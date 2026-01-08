@@ -7,7 +7,7 @@ import '../../components/avatar.dart';
 import '../../components/skeletons.dart';
 import '../../main.dart';
 import '../../theme/app_theme_extensions.dart';
-import '../../pages/settings_page.dart';
+import 'settings_page.dart';
 import 'edit_profile_screen.dart';
 
 class ProfilePage extends StatefulWidget {

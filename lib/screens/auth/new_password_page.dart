@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../main.dart';
+import '../../main.dart';
 
 class NewPasswordPage extends StatefulWidget {
   const NewPasswordPage({super.key});
@@ -14,8 +14,7 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _isLoading = false;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -34,8 +33,12 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   bool _validate() {
     final password = _passwordController.text;
     final confirm = _confirmController.text;
-    if (password.length < 6) {
-      context.showSnackBar('La nueva contraseña debe tener al menos 6 caracteres');
+    final hasMinLength = password.length >= 8;
+    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    final hasLowercase = password.contains(RegExp(r'[a-z]'));
+    final hasNumber = password.contains(RegExp(r'[0-9]'));
+    if (!hasMinLength || !hasUppercase || !hasLowercase || !hasNumber) {
+      context.showSnackBar('La contraseña no cumple los requisitos');
       return false;
     }
     if (password != confirm) {
@@ -51,8 +54,23 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
     try {
       await supabase.auth.updateUser(UserAttributes(password: _passwordController.text));
       if (mounted) {
-        context.showSnackBar('Contraseña actualizada. Inicia sesión nuevamente.');
-        Navigator.of(context).pop();
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Contraseña actualizada'),
+            content: const Text('Tu contraseña fue cambiada exitosamente. Inicia sesión nuevamente.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+                child: const Text('Ir a login'),
+              ),
+            ],
+          ),
+        );
       }
     } on AuthException catch (e) {
       if (mounted) context.showSnackBar(e.message, isError: true);
@@ -66,27 +84,14 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   Widget _buildPasswordMatchIcon() {
     final password = _passwordController.text;
     final confirm = _confirmController.text;
-    
     if (confirm.isEmpty) {
-      return IconButton(
-        icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-        onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-      );
+      // Retorna un widget invisible para cumplir el tipo Widget
+      return const SizedBox.shrink();
     }
-    
     final match = password == confirm;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          match ? Icons.check_circle : Icons.cancel,
-          color: match ? Colors.green : Colors.red,
-        ),
-        IconButton(
-          icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-        ),
-      ],
+    return Icon(
+      match ? Icons.check_circle : Icons.cancel,
+      color: match ? Colors.green : Colors.red,
     );
   }
 
@@ -147,6 +152,13 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+    final hasMinLength = password.length >= 8;
+    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    final hasLowercase = password.contains(RegExp(r'[a-z]'));
+    final hasNumber = password.contains(RegExp(r'[0-9]'));
+    final allValid = hasMinLength && hasUppercase && hasLowercase && hasNumber && password == confirm && password.isNotEmpty && confirm.isNotEmpty;
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva contraseña')),
       body: ListView(
@@ -159,24 +171,57 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
             decoration: InputDecoration(
               labelText: 'Nueva contraseña',
               suffixIcon: IconButton(
-                icon: Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                tooltip: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
               ),
             ),
-            obscureText: _obscureNew,
+            obscureText: _obscurePassword,
+            onChanged: (_) => setState(() {}),
           ),
           _buildPasswordRequirements(),
           TextFormField(
             controller: _confirmController,
+            obscureText: _obscurePassword,
+            onChanged: (_) => setState(() {}),
+            style: TextStyle(
+              color: confirm.isEmpty
+                  ? null
+                  : (password == confirm ? Colors.green : Colors.red),
+            ),
             decoration: InputDecoration(
               labelText: 'Confirmar contraseña',
-              suffixIcon: _buildPasswordMatchIcon(),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPasswordMatchIcon(),
+                  IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    tooltip: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                  ),
+                ],
+              ),
+              enabledBorder: confirm.isEmpty
+                  ? null
+                  : OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: password == confirm ? Colors.green : Colors.red,
+                      ),
+                    ),
+              focusedBorder: confirm.isEmpty
+                  ? null
+                  : OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: password == confirm ? Colors.green : Colors.red,
+                        width: 2,
+                      ),
+                    ),
             ),
-            obscureText: _obscureConfirm,
           ),
           const SizedBox(height: 18),
           ElevatedButton(
-            onPressed: _isLoading ? null : _updatePassword,
+            onPressed: _isLoading || !allValid ? null : _updatePassword,
             child: Text(_isLoading ? 'Actualizando...' : 'Actualizar contraseña'),
           ),
         ],

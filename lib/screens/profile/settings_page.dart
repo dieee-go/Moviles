@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../main.dart';
-import '../models/notification_model.dart';
-import '../providers/notification_preferences_provider.dart';
-import '../theme/app_theme_extensions.dart';
+import '../../main.dart';
+import '../../models/notification_model.dart';
+import '../../providers/notification_preferences_provider.dart';
+import '../../theme/app_theme_extensions.dart';
 import 'change_password_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {

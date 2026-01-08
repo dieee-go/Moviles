@@ -10,7 +10,7 @@ import '../events/calendar_screen.dart';
 import '../events/explore_events_screen.dart';
 import '../events/my_events_screen.dart';
 import '../events/my_registrations_screen.dart';
-import 'inicio_screen.dart';
+import 'inicio_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _setupNavigation(String? role) {
     if (role == 'admin') {
       _pages = [
-        InicioScreen(),
+        const InicioPage(),
         ExploreEventsScreen(),
         AdminPanelScreen(),
         const CalendarScreen(),
@@ -103,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
     } else if (role == 'organizer') {
       _pages = [
-        InicioScreen(),
+        const InicioPage(),
         ExploreEventsScreen(),
         MyEventsScreen(key: MyEventsScreen.globalKey),
         const CalendarScreen(),
@@ -117,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       // Estudiante o sin rol
       _pages = [
-        InicioScreen(),
+        const InicioPage(),
         ExploreEventsScreen(),
         MyRegistrationsScreen(),
         const CalendarScreen(),
