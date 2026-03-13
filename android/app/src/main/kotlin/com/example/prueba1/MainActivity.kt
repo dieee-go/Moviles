@@ -1,4 +1,4 @@
-package com.example.unieventos
+package com.barvril.unieventos
 
 import io.flutter.embedding.android.FlutterActivity
 

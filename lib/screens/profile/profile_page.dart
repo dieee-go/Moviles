@@ -245,9 +245,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       case 'admin':
         return Colors.red;
       case 'organizer':
-        return Colors.blue;
+        return Colors.green;
       default:
-        return Colors.grey;
+        return Colors.blue;
     }
   }
 
